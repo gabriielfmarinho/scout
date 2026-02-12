@@ -1,0 +1,17 @@
+{
+  "name": "scout-mcp",
+  "version": "0.1.0",
+  "description": "Scout MCP server for software engineering context and analysis",
+  "license": "MIT",
+  "type": "commonjs",
+  "bin": {
+    "scout-mcp": "bin/scout-mcp"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node bin/scout-mcp",
+    "test": "node --test"
+  }
+}
