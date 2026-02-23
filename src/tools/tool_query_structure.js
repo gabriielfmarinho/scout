@@ -21,7 +21,7 @@ async function toolQueryStructure(args) {
   const maxResults = Number(args.max_results || 50);
   const contextPack = args.context_pack || "default";
   const evidenceLevel = args.evidence_level || "standard";
-  const persistToContext = args.persist_to_context === true;
+  const persistToContext = args.persist_to_context !== false;
   const persistTopic = normalizeTopicName(args.persist_topic || "flows", "flows");
 
   const index = updateStructuralIndex(cwd);

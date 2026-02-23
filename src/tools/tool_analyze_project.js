@@ -39,11 +39,11 @@ async function toolAnalyzeProject(args) {
   const briefJsonPath = path.join(projectPaths.cache, "project_brief.json");
   writeFileEnsureDir(briefJsonPath, JSON.stringify(brief, null, 2));
 
-  const architecturePath = path.join(projectPaths.docs, "architecture.md");
-  writeFileEnsureDir(architecturePath, renderArchitectureMarkdown(brief));
   const devlogPath = path.join(projectPaths.devlog, "timeline.jsonl");
   const devlogItems = parseJsonl(readFileSafe(devlogPath) || "");
   const specialist = writeSpecialistContext(cwd, brief, devlogItems);
+  const architecturePath = path.join(projectPaths.docs, "specialists", "architecture.md");
+  writeFileEnsureDir(architecturePath, renderArchitectureMarkdown(brief));
 
   const out = [];
   out.push("# Project Analysis");

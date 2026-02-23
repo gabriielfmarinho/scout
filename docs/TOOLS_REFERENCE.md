@@ -21,7 +21,7 @@ This reference documents each tool, its parameters, and output format.
   - `quick` (bool, default false)
 - Output: Markdown summary + evidence references. Persists:
   - `cache/fingerprint.json`
-  - `docs/architecture.md`
+  - `docs/specialists/architecture.md`
 
 ## search_project
 - Purpose: Keyword or hybrid code search with evidence.
@@ -50,7 +50,7 @@ This reference documents each tool, its parameters, and output format.
   - `max_context_chars` (int, default 10000)
   - `max_per_file` (int, default 5)
   - `max_results` (int, default 50)
-  - `persist_to_context` (bool, default `false`) append analysis results into project specialist context
+  - `persist_to_context` (bool, default `true`) append analysis results into project specialist context
   - `persist_topic` (string, default `flows`) specialist topic used when persisting
 - Output: TOON table: `component | impact | risk | evidence`
 
@@ -60,7 +60,8 @@ This reference documents each tool, its parameters, and output format.
   - `context_pack` (default|debug|refactor|review, default `default`)
 - Output: Markdown report. Persists:
   - `cache/project_brief.json`
-  - `docs/project-brief.md`
+  - `docs/active-context.md` (project brief router/index)
+  - `docs/specialists/architecture.md`
 
 ## query_structure
 - Purpose: Structured repo queries against structural index.
@@ -70,7 +71,7 @@ This reference documents each tool, its parameters, and output format.
   - `max_results` (int, default 50)
   - `context_pack` (default|debug|refactor|review, default `default`)
   - `evidence_level` (minimal|standard|full, default `standard`)
-  - `persist_to_context` (bool, default `false`) append query findings into project specialist context
+  - `persist_to_context` (bool, default `true`) append query findings into project specialist context
   - `persist_topic` (string, default `flows`) specialist topic used when persisting
 - Output: TOON table with evidence.
 

@@ -29,8 +29,9 @@ Scout runs as a local process (stdio MCP server). All analysis is done on the lo
         fingerprint.json
         index.json
       docs/
-        architecture.md
         active-context.md
+        specialists/
+          architecture.md
         decisions.md
         glossary.md
       devlog/
@@ -41,7 +42,8 @@ Scout runs as a local process (stdio MCP server). All analysis is done on the lo
 Global context is persisted canonically in `~/.engineering-ai/global/context_manifest.json` and `~/.engineering-ai/global/specialists/*.json`. `active-context.md` is an index/derived view. `get_context_bundle` supports on-demand global loading via `global_topics`.
 
 ### Project context
-`~/.engineering-ai/projects/<project-name>/docs/active-context.md` stores preferences and rules specific to the current repo.
+`~/.engineering-ai/projects/<project-name>/docs/active-context.md` is the single project brief router/index for progressive disclosure. Detailed context lives in `docs/specialists/*.md` and `cache/specialists/*.json`.
+If a specialist topic exists (for example `runtime`, `integrations`, `conventions`, `hotspots`), its content should live only in that specialist file to avoid duplication.
 
 ## Requirements
 - Node.js 18+
@@ -136,13 +138,14 @@ Example call:
 
 ### 4) `analyze_impact`
 When to use: assess what may break if changing X. Combines structural and lexical signals.
+Default behavior: persists the analyzed flow into project context (`persist_to_context=true`).
 
 Example call:
 ```json
 { "name": "analyze_impact", "arguments": { "target": "billing status", "context_pack": "refactor", "evidence_level": "standard" } }
 ```
 
-Persist point-analysis into project context (merge, no full rewrite):
+Optional explicit persist configuration:
 ```json
 { "name": "analyze_impact", "arguments": { "target": "processPayment", "persist_to_context": true, "persist_topic": "flow-investigation" } }
 ```
@@ -157,13 +160,14 @@ Example call:
 
 ### 6) `query_structure`
 When to use: run structured queries like who-calls, what-calls, and find-symbol.
+Default behavior: persists the analyzed/query result into project context (`persist_to_context=true`).
 
 Example call:
 ```json
 { "name": "query_structure", "arguments": { "mode": "who_calls", "target": "processPayment", "evidence_level": "minimal" } }
 ```
 
-Persist point-query into project context (merge, no full rewrite):
+Optional explicit persist configuration:
 ```json
 { "name": "query_structure", "arguments": { "mode": "who_calls", "target": "processPayment", "persist_to_context": true, "persist_topic": "flow-investigation" } }
 ```
@@ -267,12 +271,12 @@ This allows the LLM to verify claims and reduces hallucination.
 - Dynamic topics: both project and global contexts accept dynamic specialist topics in addition to predefined ones.
 - Lossless persistence: canonical context is stored in full specialist files under `cache/specialists/*.json`; pagination limits response size, not stored data.
 - Automatic quality metadata: persisted entries keep `summary`, `rationale`, `owner`, `confidence`, `status`, `quality_score`, and `quality_issues`.
-- Analysis merges with quality fields: `analyze_impact` and `query_structure` persist structured entries (not only raw text) when `persist_to_context=true`.
+- Analysis merges with quality fields: `analyze_impact` and `query_structure` persist structured entries (not only raw text) by default.
 
 ## Canonical persistence
 - `cache/project_brief.json` is the canonical project intelligence snapshot.
-- `cache/fingerprint.json` and `docs/architecture.md` are derived from the brief to keep outputs cohesive.
-- `docs/active-context.md` is generated from the brief (plus recent devlog) by `compress_context`.
+- `cache/fingerprint.json` and `docs/specialists/architecture.md` are derived from the brief to keep outputs cohesive.
+- `docs/active-context.md` is the canonical project brief router/index generated from specialists.
 
 ## Why Scout
 - Lean context control: task packs, evidence levels, and strict context budget.

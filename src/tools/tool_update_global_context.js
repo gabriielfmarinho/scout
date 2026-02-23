@@ -92,17 +92,19 @@ async function toolUpdateGlobalContext(args) {
       evidence: e.evidence || "",
     }));
   } else {
-    const mergedByText = new Map();
+    const mergedByTopicText = new Map();
     for (const existing of existingLines) {
-      const prev = mergedByText.get(existing.text);
+      const topic = normalizeTopicName(existing.topic || classifyTopic(existing.text), "general");
+      const key = `${topic}|${existing.text}`;
+      const prev = mergedByTopicText.get(key);
       if (!prev || existing.priority === "must") {
-        mergedByText.set(existing.text, {
+        mergedByTopicText.set(key, {
           text: existing.text,
           summary: existing.summary || existing.text,
           decision: existing.decision || "",
           rationale: existing.rationale || "",
           priority: existing.priority,
-          topic: existing.topic || classifyTopic(existing.text),
+          topic,
           confidence: existing.confidence || "medium",
           owner: existing.owner || "",
           status: existing.status || "draft",
@@ -114,15 +116,17 @@ async function toolUpdateGlobalContext(args) {
       }
     }
     for (const e of entries) {
-      const prev = mergedByText.get(e.text);
+      const topic = normalizeTopicName(e.topic || classifyTopic(e.text), "general");
+      const key = `${topic}|${e.text}`;
+      const prev = mergedByTopicText.get(key);
       if (!prev || e.priority === "must" || prev.priority !== "must") {
-        mergedByText.set(e.text, {
+        mergedByTopicText.set(key, {
           text: e.text,
           summary: e.summary || e.text,
           decision: e.decision || "",
           rationale: e.rationale || "",
           priority: e.priority,
-          topic: e.topic,
+          topic,
           confidence: e.confidence || "medium",
           owner: e.owner || "",
           status: e.status || "draft",
@@ -133,7 +137,7 @@ async function toolUpdateGlobalContext(args) {
         });
       }
     }
-    finalEntries = [...mergedByText.values()].map((e, idx) => ({
+    finalEntries = [...mergedByTopicText.values()].map((e, idx) => ({
       id: `append-${Date.now()}-${idx}`,
       text: e.text,
       summary: e.summary || e.text,

@@ -11,6 +11,7 @@ const { ensureProjectDirs } = require("./paths");
 
 const MAX_FILE_BYTES = 1024 * 1024;
 const INTEL_CACHE_VERSION = 1;
+const NON_SIGNAL_RE = /^(unknown|none detected|n\/a|na|not identified|nao identificado|não identificado)$/i;
 
 function rel(cwd, filePath) {
   return path.relative(cwd, filePath) || filePath;
@@ -315,6 +316,60 @@ function buildStructuralHotspots(struct) {
   return hotspots;
 }
 
+function normalizeList(values) {
+  const out = [];
+  const seen = new Set();
+  for (const v of values || []) {
+    const text = String(v || "").trim();
+    if (!text || NON_SIGNAL_RE.test(text)) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(text);
+  }
+  return out;
+}
+
+function mergeSignalLists(primary, fallback, inferred) {
+  return normalizeList([...(primary || []), ...(inferred || []), ...(fallback || [])]);
+}
+
+function inferSummaryFromEvidence(evidence) {
+  const inferred = {
+    frameworks: [],
+    infra: [],
+    ci: [],
+    buildTools: [],
+    monorepo: [],
+    data: [],
+  };
+  for (const e of evidence || []) {
+    const topic = String(e.topic || "").trim().toLowerCase();
+    const value = String(e.value || "").trim();
+    if (!value || NON_SIGNAL_RE.test(value)) continue;
+    if (topic === "framework") inferred.frameworks.push(value);
+    if (topic === "infra") inferred.infra.push(value);
+    if (topic === "ci") inferred.ci.push(value);
+    if (topic === "build-tool") inferred.buildTools.push(value);
+    if (topic === "monorepo") inferred.monorepo.push(value);
+    if (topic === "data") inferred.data.push(value);
+  }
+  return inferred;
+}
+
+function loadPreviousBriefSummary(cwd) {
+  try {
+    const projectPaths = ensureProjectDirs(cwd);
+    const briefPath = path.join(projectPaths.cache, "project_brief.json");
+    const raw = readFileSafe(briefPath);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && parsed.summary ? parsed.summary : {};
+  } catch {
+    return {};
+  }
+}
+
 function createProjectIntelligence(cwd, options = {}) {
   const started = Date.now();
   const analysis = analyzeProject(cwd, true);
@@ -374,24 +429,28 @@ function createProjectIntelligence(cwd, options = {}) {
   if (!markers.hasPrettier) conventions.push({ convention: "No Prettier config detected", evidence: "repo:1-1: missing format config" });
   hotspots.push(...buildStructuralHotspots(struct));
 
+  const previousSummary = loadPreviousBriefSummary(cwd);
+  const inferred = inferSummaryFromEvidence(analysis.evidence || []);
+  const mergedSummary = {
+    languages: mergeSignalLists(analysis.languages || [], previousSummary.languages || [], []),
+    buildTools: mergeSignalLists(analysis.buildTools || [], previousSummary.buildTools || [], inferred.buildTools || []),
+    frameworks: mergeSignalLists(analysis.frameworks || [], previousSummary.frameworks || [], inferred.frameworks || []),
+    infra: mergeSignalLists(analysis.infra || [], previousSummary.infra || [], inferred.infra || []),
+    ci: mergeSignalLists(analysis.ci || [], previousSummary.ci || [], inferred.ci || []),
+    data: mergeSignalLists(analysis.data || [], previousSummary.data || [], inferred.data || []),
+    test: mergeSignalLists(analysis.test || [], previousSummary.test || [], []),
+    monorepo: mergeSignalLists(analysis.monorepo || [], previousSummary.monorepo || [], inferred.monorepo || []),
+    architectureHints: mergeSignalLists(analysis.architecture || [], previousSummary.architectureHints || [], []),
+    symbols: (struct.symbols || []).length,
+    calls: (struct.calls || []).length,
+    references: (struct.references || []).length,
+  };
+
   return {
     generatedAt: new Date().toISOString(),
     canonical: true,
-    canonicalFor: ["architecture.md", "active-context.md", "fingerprint.json"],
-    summary: {
-      languages: analysis.languages || [],
-      buildTools: analysis.buildTools || [],
-      frameworks: analysis.frameworks || [],
-      infra: analysis.infra || [],
-      ci: analysis.ci || [],
-      data: analysis.data || [],
-      test: analysis.test || [],
-      monorepo: analysis.monorepo || [],
-      architectureHints: analysis.architecture || [],
-      symbols: (struct.symbols || []).length,
-      calls: (struct.calls || []).length,
-      references: (struct.references || []).length,
-    },
+    canonicalFor: ["docs/specialists/architecture.md", "docs/active-context.md", "fingerprint.json"],
+    summary: mergedSummary,
     incremental: {
       total_files: Object.keys(fileIndex.files || {}).length,
       changed_files: changedFiles,
@@ -427,7 +486,7 @@ function deriveFingerprint(brief) {
 }
 
 function listOrUnknown(items) {
-  return items && items.length ? items.join(", ") : "unknown";
+  return items && items.length ? items.join(", ") : "";
 }
 
 function renderArchitectureMarkdown(brief) {
@@ -437,16 +496,18 @@ function renderArchitectureMarkdown(brief) {
   lines.push("# Architecture Summary");
   lines.push("");
   lines.push(`- Source of truth: project_brief.json (${brief.generatedAt || "unknown"})`);
-  lines.push(`- Languages: ${listOrUnknown(s.languages)}`);
-  lines.push(`- Build tools: ${listOrUnknown(s.buildTools)}`);
-  lines.push(`- Frameworks: ${listOrUnknown(s.frameworks)}`);
-  lines.push(`- Infra: ${s.infra && s.infra.length ? s.infra.join(", ") : "none detected"}`);
-  lines.push(`- CI/CD: ${s.ci && s.ci.length ? s.ci.join(", ") : "none detected"}`);
-  lines.push(`- Data: ${s.data && s.data.length ? s.data.join(", ") : "none detected"}`);
-  lines.push(`- Tests: ${s.test && s.test.length ? s.test.join(", ") : "none detected"}`);
-  lines.push(`- Monorepo: ${s.monorepo && s.monorepo.length ? s.monorepo.join(", ") : "none detected"}`);
-  lines.push(`- Architecture hints: ${s.architectureHints && s.architectureHints.length ? s.architectureHints.join(", ") : "none detected"}`);
-  lines.push(`- Structural index: symbols=${s.symbols || 0} calls=${s.calls || 0} refs=${s.references || 0}`);
+  if (listOrUnknown(s.languages)) lines.push(`- Languages: ${listOrUnknown(s.languages)}`);
+  if (listOrUnknown(s.buildTools)) lines.push(`- Build tools: ${listOrUnknown(s.buildTools)}`);
+  if (listOrUnknown(s.frameworks)) lines.push(`- Frameworks: ${listOrUnknown(s.frameworks)}`);
+  if (s.infra && s.infra.length) lines.push(`- Infra: ${s.infra.join(", ")}`);
+  if (s.ci && s.ci.length) lines.push(`- CI/CD: ${s.ci.join(", ")}`);
+  if (s.data && s.data.length) lines.push(`- Data: ${s.data.join(", ")}`);
+  if (s.test && s.test.length) lines.push(`- Tests: ${s.test.join(", ")}`);
+  if (s.monorepo && s.monorepo.length) lines.push(`- Monorepo: ${s.monorepo.join(", ")}`);
+  if (s.architectureHints && s.architectureHints.length) lines.push(`- Architecture hints: ${s.architectureHints.join(", ")}`);
+  if (Number(s.symbols || 0) > 0 || Number(s.calls || 0) > 0 || Number(s.references || 0) > 0) {
+    lines.push(`- Structural index: symbols=${s.symbols || 0} calls=${s.calls || 0} refs=${s.references || 0}`);
+  }
 
   if (brief.incremental) {
     lines.push(`- Incremental intelligence: changed=${brief.incremental.changed_files} reused=${brief.incremental.reused_files} total=${brief.incremental.total_files} latency_ms=${brief.incremental.latency_ms}`);

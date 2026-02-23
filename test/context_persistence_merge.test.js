@@ -53,6 +53,30 @@ test("project specialist references are preserved after full re-analysis", async
   else process.env.SCOUT_PROJECT_ROOT = prevEnv;
 });
 
+test("auto-generated specialist entries are merged without losing previous signals", async () => {
+  const tmp = makeTempDir();
+  const prevCwd = process.cwd();
+  const prevEnv = process.env.SCOUT_PROJECT_ROOT;
+  process.env.SCOUT_PROJECT_ROOT = tmp;
+  process.chdir(tmp);
+
+  fs.writeFileSync(path.join(tmp, "package.json"), JSON.stringify({ name: "demo", dependencies: { express: "4.0.0" } }), "utf8");
+  fs.mkdirSync(path.join(tmp, "src"), { recursive: true });
+  fs.writeFileSync(path.join(tmp, "src", "api.js"), "app.get('/v1/orders', handler)\n", "utf8");
+
+  await toolGenerateProjectBrief({ context_pack: "default" });
+
+  fs.writeFileSync(path.join(tmp, "src", "api.js"), "// temporary empty scan window\n", "utf8");
+  await toolGenerateProjectBrief({ context_pack: "default" });
+
+  const out = await toolGetContextBundle({ topics: ["flows"], include_preferential: true, page_size: 100 });
+  assert.match(out, /GET \/v1\/orders/);
+
+  process.chdir(prevCwd);
+  if (prevEnv === undefined) delete process.env.SCOUT_PROJECT_ROOT;
+  else process.env.SCOUT_PROJECT_ROOT = prevEnv;
+});
+
 test("analyze_impact can merge point analysis into project context", async () => {
   const tmp = makeTempDir();
   const prevCwd = process.cwd();
@@ -75,6 +99,33 @@ test("analyze_impact can merge point analysis into project context", async () =>
   const out = await toolGetContextBundle({ topics: ["flow-investigation"], include_preferential: true, page_size: 50 });
   assert.match(out, /flow-investigation/);
   assert.match(out, /processPayment/);
+
+  process.chdir(prevCwd);
+  if (prevEnv === undefined) delete process.env.SCOUT_PROJECT_ROOT;
+  else process.env.SCOUT_PROJECT_ROOT = prevEnv;
+});
+
+test("analyze_impact persists to context by default", async () => {
+  const tmp = makeTempDir();
+  const prevCwd = process.cwd();
+  const prevEnv = process.env.SCOUT_PROJECT_ROOT;
+  process.env.SCOUT_PROJECT_ROOT = tmp;
+  process.chdir(tmp);
+
+  fs.writeFileSync(path.join(tmp, "package.json"), JSON.stringify({ name: "demo" }), "utf8");
+  fs.mkdirSync(path.join(tmp, "src"), { recursive: true });
+  fs.writeFileSync(path.join(tmp, "src", "orders.js"), "function calculateTotal() {}\ncalculateTotal()\n", "utf8");
+
+  await toolGenerateProjectBrief({ context_pack: "default" });
+  await toolAnalyzeImpact({
+    target: "calculateTotal",
+    persist_topic: "flow-investigation",
+    max_results: 10,
+  });
+
+  const out = await toolGetContextBundle({ topics: ["flow-investigation"], include_preferential: true, page_size: 50 });
+  assert.match(out, /flow-investigation/);
+  assert.match(out, /calculateTotal/);
 
   process.chdir(prevCwd);
   if (prevEnv === undefined) delete process.env.SCOUT_PROJECT_ROOT;

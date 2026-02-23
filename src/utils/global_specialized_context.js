@@ -71,10 +71,11 @@ function parseLegacyActiveContext(content, filePath) {
 }
 
 function uniqueEntries(entries) {
-  const byText = new Map();
+  const byTopicText = new Map();
   for (const entry of entries || []) {
     const text = String(entry.text || "").trim();
     if (!text) continue;
+    const topic = normalizeTopicName(entry.topic || classifyTopic(text), "general");
     const normalized = {
       id: entry.id || "",
       text,
@@ -82,7 +83,7 @@ function uniqueEntries(entries) {
       decision: String(entry.decision || ""),
       rationale: String(entry.rationale || ""),
       priority: entry.priority === "must" ? "must" : "prefer",
-      topic: normalizeTopicName(entry.topic || classifyTopic(text), "general"),
+      topic,
       confidence: String(entry.confidence || "medium"),
       owner: String(entry.owner || ""),
       status: String(entry.status || "draft"),
@@ -91,20 +92,21 @@ function uniqueEntries(entries) {
       source: entry.source || "update_global_context",
       evidence: entry.evidence || "",
     };
-    const prev = byText.get(text);
+    const key = `${topic}|${text}`;
+    const prev = byTopicText.get(key);
     if (!prev) {
-      byText.set(text, normalized);
+      byTopicText.set(key, normalized);
       continue;
     }
     if (prev.priority !== "must" && normalized.priority === "must") {
-      byText.set(text, { ...normalized, createdAt: prev.createdAt || normalized.createdAt });
+      byTopicText.set(key, { ...normalized, createdAt: prev.createdAt || normalized.createdAt });
       continue;
     }
     if (!prev.evidence && normalized.evidence) {
-      byText.set(text, { ...prev, evidence: normalized.evidence, updatedAt: normalized.updatedAt });
+      byTopicText.set(key, { ...prev, evidence: normalized.evidence, updatedAt: normalized.updatedAt });
     }
   }
-  const list = [...byText.values()].map((item) => {
+  const list = [...byTopicText.values()].map((item) => {
     const q = computeQuality(item);
     return { ...item, quality_score: q.score, quality_issues: q.issues };
   });

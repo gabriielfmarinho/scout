@@ -3,7 +3,7 @@
 const path = require("path");
 const { ensureProjectDirs } = require("../utils/paths");
 const { readFileSafe, writeFileEnsureDir, fileExists } = require("../utils/fs_utils");
-const { buildActiveContextFromBrief, deriveFingerprint } = require("../utils/project_intelligence");
+const { deriveFingerprint } = require("../utils/project_intelligence");
 const { parseJsonl, writeSpecialistContext } = require("../utils/specialized_context");
 
 function extractTerms(text) {
@@ -19,8 +19,6 @@ async function toolCompressContext(args) {
   const cwd = resolveProjectRoot();
   log("info", "compress_context_root", { root: cwd });
   const projectPaths = ensureProjectDirs(cwd);
-  const maxBullets = Number(args.max_bullets || 30);
-
   const briefPath = path.join(projectPaths.cache, "project_brief.json");
   const brief = fileExists(briefPath)
     ? JSON.parse(readFileSafe(briefPath))
@@ -39,26 +37,20 @@ async function toolCompressContext(args) {
   const devlogContent = readFileSafe(devlogPath) || "";
   const devlogItems = parseJsonl(devlogContent);
 
-  const activeContext = brief
-    ? buildActiveContextFromBrief(brief, devlogItems, Number.MAX_SAFE_INTEGER)
-    : (() => {
-      const lines = [];
-      if (fingerprint) {
-        lines.push(`- Languages: ${fingerprint.languages?.join(", ") || "unknown"}`);
-        lines.push(`- Build tools: ${fingerprint.buildTools?.join(", ") || "unknown"}`);
-        lines.push(`- Frameworks: ${fingerprint.frameworks?.join(", ") || "unknown"}`);
-        lines.push(`- Infra: ${fingerprint.infra?.join(", ") || "none detected"}`);
-      }
-      for (const item of devlogItems) {
-        if (item && item.summary) lines.push(`- Recent: ${item.summary}`);
-      }
-      return lines.join("\n") + "\n";
-    })();
-  const activePath = path.join(projectPaths.docs, "active-context.md");
-  writeFileEnsureDir(activePath, activeContext);
+  let activePath = path.join(projectPaths.docs, "active-context.md");
   let specialist = null;
   if (brief) {
     specialist = writeSpecialistContext(cwd, brief, devlogItems);
+    activePath = specialist.activePath;
+  } else {
+    const lines = ["# Active Context", "", "No canonical project brief found. Run `generate_project_brief` first.", ""];
+    if (fingerprint) {
+      lines.push(`- Languages: ${fingerprint.languages?.join(", ") || "unknown"}`);
+      lines.push(`- Build tools: ${fingerprint.buildTools?.join(", ") || "unknown"}`);
+      lines.push(`- Frameworks: ${fingerprint.frameworks?.join(", ") || "unknown"}`);
+      lines.push(`- Infra: ${fingerprint.infra?.join(", ") || "none detected"}`);
+    }
+    writeFileEnsureDir(activePath, lines.join("\n") + "\n");
   }
 
   const decisions = devlogItems.filter((i) => i.type === "decision");

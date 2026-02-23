@@ -54,13 +54,14 @@ function ensureCanonicalSpecialists(cwd, projectPaths) {
     writeFileEnsureDir(briefPath, JSON.stringify(brief, null, 2));
     const fingerprintPath = path.join(projectPaths.cache, "fingerprint.json");
     writeFileEnsureDir(fingerprintPath, JSON.stringify(deriveFingerprint(brief), null, 2));
-    const architecturePath = path.join(projectPaths.docs, "architecture.md");
-    writeFileEnsureDir(architecturePath, renderArchitectureMarkdown(brief));
   }
 
   const devlogPath = path.join(projectPaths.devlog, "timeline.jsonl");
   const devlogItems = parseJsonl(readFileSafe(devlogPath) || "");
-  return writeSpecialistContext(cwd, brief, devlogItems).manifest;
+  const persisted = writeSpecialistContext(cwd, brief, devlogItems);
+  const architecturePath = path.join(projectPaths.docs, "specialists", "architecture.md");
+  writeFileEnsureDir(architecturePath, renderArchitectureMarkdown(brief));
+  return persisted.manifest;
 }
 
 async function toolGetContextBundle(args) {

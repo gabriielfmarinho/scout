@@ -21,7 +21,7 @@ async function toolAnalyzeImpact(args) {
   const cwd = resolveProjectRoot();
   log("info", "analyze_impact_root", { root: cwd });
   const target = args.target;
-  const persistToContext = args.persist_to_context === true;
+  const persistToContext = args.persist_to_context !== false;
   const persistTopic = normalizeTopicName(args.persist_topic || "flows", "flows");
   const max_results = Number(args.max_results || 50);
   const contextPack = args.context_pack || "default";

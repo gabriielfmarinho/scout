@@ -3,8 +3,8 @@
 This guide shows common workflows and how tools should be combined.
 
 ## 1) First-time project bootstrap
-1. Call `analyze_project` to create `fingerprint.json` and `architecture.md`.
-2. Call `compress_context` to generate initial `active-context.md`.
+1. Call `analyze_project` to create `fingerprint.json` and `docs/specialists/architecture.md`.
+2. Call `compress_context` to refresh `active-context.md` as the project brief router/index.
 3. Optionally call `devlog_append` to log initial analysis.
 
 Example (tool calls):
