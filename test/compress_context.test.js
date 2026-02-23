@@ -7,6 +7,7 @@ const os = require("os");
 const path = require("path");
 const { toolCompressContext } = require("../src/tools/tool_compress_context");
 const { ensureProjectDirs } = require("../src/utils/paths");
+const { getCoreFilePath } = require("../src/utils/cache_files");
 
 function makeTempDir() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "scout-test-"));
@@ -27,7 +28,7 @@ test("compress_context writes active-context from fingerprint", async () => {
     frameworks: ["Express"],
     infra: ["Dockerfile"],
   };
-  fs.writeFileSync(path.join(projectPaths.cache, "fingerprint.json"), JSON.stringify(fingerprint));
+  fs.writeFileSync(getCoreFilePath(projectPaths, "fingerprint.json"), JSON.stringify(fingerprint));
   fs.writeFileSync(path.join(projectPaths.devlog, "timeline.jsonl"), "");
 
   await toolCompressContext({ max_bullets: 10 });

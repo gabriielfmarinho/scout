@@ -1,13 +1,13 @@
 "use strict";
 
-const path = require("path");
 const { ensureProjectDirs } = require("./paths");
 const { writeFileEnsureDir, readFileSafe } = require("./fs_utils");
+const { getCoreFilePath } = require("./cache_files");
 
 function appendTelemetry(cwd, tool, data = {}) {
   try {
     const projectPaths = ensureProjectDirs(cwd);
-    const filePath = path.join(projectPaths.cache, "telemetry.jsonl");
+    const filePath = getCoreFilePath(projectPaths, "telemetry.jsonl");
     const existing = readFileSafe(filePath) || "";
     const entry = {
       ts: new Date().toISOString(),
@@ -21,4 +21,3 @@ function appendTelemetry(cwd, tool, data = {}) {
 }
 
 module.exports = { appendTelemetry };
-

@@ -7,6 +7,7 @@ const os = require("os");
 const path = require("path");
 const { toolGenerateProjectBrief } = require("../src/tools/tool_generate_project_brief");
 const { ensureProjectDirs } = require("../src/utils/paths");
+const { getCoreFilePath } = require("../src/utils/cache_files");
 
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "scout-brief-"));
@@ -29,7 +30,7 @@ test("generate_project_brief persists json brief and specialist architecture", a
 
   await toolGenerateProjectBrief({ context_pack: "default" });
 
-  const briefJson = path.join(projectPaths.cache, "project_brief.json");
+  const briefJson = getCoreFilePath(projectPaths, "project_brief.json");
   const architectureMd = path.join(projectPaths.docs, "specialists", "architecture.md");
   const activeContext = path.join(projectPaths.docs, "active-context.md");
   assert.ok(fs.existsSync(briefJson));
@@ -78,6 +79,65 @@ test("generate_project_brief does not regress detected architecture signals on p
   const content = fs.readFileSync(architectureMd, "utf8");
   assert.match(content, /Frameworks: Express/);
   assert.match(content, /Infra: Dockerfile/);
+
+  process.chdir(prevCwd);
+  if (prevEnv === undefined) {
+    delete process.env.SCOUT_PROJECT_ROOT;
+  } else {
+    process.env.SCOUT_PROJECT_ROOT = prevEnv;
+  }
+});
+
+test("flow detection ignores docs/tests noise and keeps source flows", async () => {
+  const tmp = makeTempDir();
+  const prevCwd = process.cwd();
+  const prevEnv = process.env.SCOUT_PROJECT_ROOT;
+  process.env.SCOUT_PROJECT_ROOT = tmp;
+  process.chdir(tmp);
+  const projectPaths = ensureProjectDirs(tmp);
+
+  fs.writeFileSync(path.join(tmp, "package.json"), JSON.stringify({ name: "demo", dependencies: { express: "4.0.0" } }), "utf8");
+  fs.mkdirSync(path.join(tmp, "src"), { recursive: true });
+  fs.mkdirSync(path.join(tmp, "docs"), { recursive: true });
+  fs.mkdirSync(path.join(tmp, "tests"), { recursive: true });
+  fs.writeFileSync(path.join(tmp, "src", "api.js"), "app.get('/real-flow', handler)\n", "utf8");
+  fs.writeFileSync(path.join(tmp, "docs", "notes.md"), "app.get('/doc-flow', handler)\n", "utf8");
+  fs.writeFileSync(path.join(tmp, "tests", "api.test.js"), "app.get('/test-flow', handler)\n", "utf8");
+
+  await toolGenerateProjectBrief({ context_pack: "default" });
+
+  const flows = JSON.parse(fs.readFileSync(path.join(projectPaths.cache, "specialists", "flows.json"), "utf8"));
+  const texts = (flows.items || []).map((i) => i.text).join("\n");
+  assert.match(texts, /real-flow/);
+  assert.doesNotMatch(texts, /doc-flow/);
+  assert.doesNotMatch(texts, /test-flow/);
+
+  process.chdir(prevCwd);
+  if (prevEnv === undefined) {
+    delete process.env.SCOUT_PROJECT_ROOT;
+  } else {
+    process.env.SCOUT_PROJECT_ROOT = prevEnv;
+  }
+});
+
+test("conventions persist monorepo and multi-module signals", async () => {
+  const tmp = makeTempDir();
+  const prevCwd = process.cwd();
+  const prevEnv = process.env.SCOUT_PROJECT_ROOT;
+  process.env.SCOUT_PROJECT_ROOT = tmp;
+  process.chdir(tmp);
+  const projectPaths = ensureProjectDirs(tmp);
+
+  fs.writeFileSync(path.join(tmp, "package.json"), JSON.stringify({ name: "demo", workspaces: ["apps/*", "packages/*"] }), "utf8");
+  fs.writeFileSync(path.join(tmp, "pnpm-workspace.yaml"), "packages:\n  - apps/*\n  - packages/*\n", "utf8");
+  fs.mkdirSync(path.join(tmp, "apps"), { recursive: true });
+  fs.mkdirSync(path.join(tmp, "packages"), { recursive: true });
+
+  await toolGenerateProjectBrief({ context_pack: "default" });
+
+  const conventions = JSON.parse(fs.readFileSync(path.join(projectPaths.cache, "specialists", "conventions.json"), "utf8"));
+  const texts = (conventions.items || []).map((i) => i.text).join("\n");
+  assert.match(texts, /Monorepo\/multi-module setup/);
 
   process.chdir(prevCwd);
   if (prevEnv === undefined) {

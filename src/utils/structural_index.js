@@ -6,6 +6,7 @@ const { ensureProjectDirs } = require("./paths");
 const { updateIndex, loadIndex } = require("./index_cache");
 const { readFileSafe, isTextFile } = require("./fs_utils");
 const { formatEvidence } = require("./snippet");
+const { getCoreFilePath } = require("./cache_files");
 
 const STRUCT_VERSION = 1;
 const MAX_FILE_BYTES = 1024 * 1024; // 1MB
@@ -23,7 +24,7 @@ function rel(cwd, filePath) {
 
 function getStructPath(cwd) {
   const projectPaths = ensureProjectDirs(cwd);
-  return path.join(projectPaths.cache, "structural_index.json");
+  return getCoreFilePath(projectPaths, "structural_index.json");
 }
 
 function loadStructuralIndex(cwd) {
@@ -226,4 +227,3 @@ module.exports = {
   findWhatCalls,
   findSymbol,
 };
-

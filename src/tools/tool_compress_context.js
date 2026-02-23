@@ -2,9 +2,10 @@
 
 const path = require("path");
 const { ensureProjectDirs } = require("../utils/paths");
-const { readFileSafe, writeFileEnsureDir, fileExists } = require("../utils/fs_utils");
+const { readFileSafe, writeFileEnsureDir } = require("../utils/fs_utils");
 const { deriveFingerprint } = require("../utils/project_intelligence");
 const { parseJsonl, writeSpecialistContext } = require("../utils/specialized_context");
+const { getCoreFilePath, readCoreText } = require("../utils/cache_files");
 
 function extractTerms(text) {
   return text
@@ -19,16 +20,14 @@ async function toolCompressContext(args) {
   const cwd = resolveProjectRoot();
   log("info", "compress_context_root", { root: cwd });
   const projectPaths = ensureProjectDirs(cwd);
-  const briefPath = path.join(projectPaths.cache, "project_brief.json");
-  const brief = fileExists(briefPath)
-    ? JSON.parse(readFileSafe(briefPath))
-    : null;
+  const briefPath = getCoreFilePath(projectPaths, "project_brief.json");
+  const briefRaw = readCoreText(projectPaths, "project_brief.json");
+  const brief = briefRaw ? JSON.parse(briefRaw) : null;
 
-  const fingerprintPath = path.join(projectPaths.cache, "fingerprint.json");
-  const legacyFingerprint = fileExists(fingerprintPath)
-    ? JSON.parse(readFileSafe(fingerprintPath))
-    : null;
-  const fingerprint = brief ? deriveFingerprint(brief) : legacyFingerprint;
+  const fingerprintPath = getCoreFilePath(projectPaths, "fingerprint.json");
+  const fingerprintRaw = readCoreText(projectPaths, "fingerprint.json");
+  const currentFingerprint = fingerprintRaw ? JSON.parse(fingerprintRaw) : null;
+  const fingerprint = brief ? deriveFingerprint(brief) : currentFingerprint;
   if (brief) {
     writeFileEnsureDir(fingerprintPath, JSON.stringify(fingerprint, null, 2));
   }

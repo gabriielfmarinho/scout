@@ -26,8 +26,16 @@ Scout runs as a local process (stdio MCP server). All analysis is done on the lo
   projects/
     <project-name>/
       cache/
-        fingerprint.json
-        index.json
+        context_manifest.json
+        core/
+          fingerprint.json
+          index.json
+          project_brief.json
+          project_intelligence_files.json
+          structural_index.json
+          telemetry.jsonl
+        specialists/
+          <topic>.json
       docs/
         active-context.md
         specialists/
@@ -130,6 +138,7 @@ Example call:
 
 ### 3) `search_project`
 When to use: locate code paths or behavior with context budget controls and task packs.
+Default behavior: persists term analysis into project context (`persist_to_context=true`).
 
 Example call:
 ```json
@@ -264,7 +273,7 @@ This allows the LLM to verify claims and reduces hallucination.
 - Retrieval tools support `evidence_level` (`minimal|standard|full`) to control context size.
 - Tools apply budget controls (`max_budget_items`, `max_context_chars`, `max_per_file`) with deduplication by evidence.
 - Structural index and project brief are persisted to disk, so heavy analysis stays outside the model context window.
-- Tool-level telemetry is persisted to `cache/telemetry.jsonl` for context and truncation monitoring.
+- Tool-level telemetry is persisted to `cache/core/telemetry.jsonl` for context and truncation monitoring.
 - Global rules support priorities: `[must]` and `[prefer]`.
 - `[must]` rules are always included in `get_context_bundle`; `[prefer]` rules are budgeted/on-demand.
 - Progressive disclosure: specialist context files are indexed in `cache/context_manifest.json` and loaded by topic/cursor on demand.
@@ -274,8 +283,8 @@ This allows the LLM to verify claims and reduces hallucination.
 - Analysis merges with quality fields: `analyze_impact` and `query_structure` persist structured entries (not only raw text) by default.
 
 ## Canonical persistence
-- `cache/project_brief.json` is the canonical project intelligence snapshot.
-- `cache/fingerprint.json` and `docs/specialists/architecture.md` are derived from the brief to keep outputs cohesive.
+- `cache/core/project_brief.json` is the canonical project intelligence snapshot.
+- `cache/core/fingerprint.json` and `docs/specialists/architecture.md` are derived from the brief to keep outputs cohesive.
 - `docs/active-context.md` is the canonical project brief router/index generated from specialists.
 
 ## Why Scout

@@ -3,7 +3,7 @@
 This guide shows common workflows and how tools should be combined.
 
 ## 1) First-time project bootstrap
-1. Call `analyze_project` to create `fingerprint.json` and `docs/specialists/architecture.md`.
+1. Call `analyze_project` to create `cache/core/fingerprint.json` and `docs/specialists/architecture.md`.
 2. Call `compress_context` to refresh `active-context.md` as the project brief router/index.
 3. Optionally call `devlog_append` to log initial analysis.
 
@@ -44,7 +44,7 @@ Always call `get_context_bundle` to load rules and preferences.
 ```
 
 ## 5) When asked to locate behavior
-Use `search_project` (keyword or hybrid) and keep snippets short.
+Use `search_project` (keyword or hybrid) and keep snippets short. Findings are persisted to project context by default.
 ```json
 { "name": "search_project", "arguments": { "query": "bucket write", "mode": "hybrid", "context_pack": "debug", "max_results": 20, "max_snippet_lines": 6 } }
 ```

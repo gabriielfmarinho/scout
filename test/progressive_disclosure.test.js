@@ -8,6 +8,7 @@ const path = require("path");
 const { toolGenerateProjectBrief } = require("../src/tools/tool_generate_project_brief");
 const { toolGetContextBundle } = require("../src/tools/tool_get_context_bundle");
 const { ensureProjectDirs } = require("../src/utils/paths");
+const { getCoreFilePath } = require("../src/utils/cache_files");
 
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "scout-progressive-"));
@@ -32,7 +33,7 @@ test("project_brief persists all detected flows without truncation", async () =>
   await toolGenerateProjectBrief({ context_pack: "default" });
 
   const projectPaths = ensureProjectDirs(tmp);
-  const brief = JSON.parse(fs.readFileSync(path.join(projectPaths.cache, "project_brief.json"), "utf8"));
+  const brief = JSON.parse(fs.readFileSync(getCoreFilePath(projectPaths, "project_brief.json"), "utf8"));
   assert.ok(Array.isArray(brief.flows));
   assert.ok(brief.flows.length >= 70);
 

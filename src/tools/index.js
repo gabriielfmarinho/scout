@@ -82,6 +82,8 @@ const TOOLS = [
         max_files: { type: "integer", minimum: 100, maximum: 20000, default: 2000 },
         max_file_bytes: { type: "integer", minimum: 1024, maximum: 5242880, default: 524288 },
         max_ms: { type: "integer", minimum: 1000, maximum: 120000, default: 20000 },
+        persist_to_context: { type: "boolean", default: true },
+        persist_topic: { type: "string", default: "flows" },
       },
       required: ["query"],
       additionalProperties: false,

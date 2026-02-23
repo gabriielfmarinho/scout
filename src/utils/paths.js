@@ -27,6 +27,8 @@ function getProjectPaths(cwd) {
   return {
     root,
     cache: path.join(root, "cache"),
+    cache_core: path.join(root, "cache", "core"),
+    cache_specialists: path.join(root, "cache", "specialists"),
     docs: path.join(root, "docs"),
     devlog: path.join(root, "devlog"),
   };
@@ -34,7 +36,7 @@ function getProjectPaths(cwd) {
 
 function ensureProjectDirs(cwd) {
   const paths = getProjectPaths(cwd);
-  for (const key of ["root", "cache", "docs", "devlog"]) {
+  for (const key of ["root", "cache", "cache_core", "cache_specialists", "docs", "devlog"]) {
     fs.mkdirSync(paths[key], { recursive: true });
   }
   return paths;

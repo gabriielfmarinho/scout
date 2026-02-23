@@ -168,6 +168,10 @@ function specialistItemsFromBrief(brief, devlogItems) {
     if (!hasSignal(c.convention)) continue;
     byTopic.conventions.push(toItem("conventions", c.convention, c.evidence, "project_brief"));
   }
+  for (const m of s.monorepo || []) {
+    if (!hasSignal(m)) continue;
+    byTopic.conventions.push(toItem("conventions", `Monorepo/multi-module setup: ${m}`, "project_brief.json:1-1: summary.monorepo", "project_brief"));
+  }
   for (const h of brief.hotspots || []) {
     if (!hasSignal(h.reason) || !hasSignal(h.risk)) continue;
     byTopic.hotspots.push(toItem("hotspots", `[${h.risk}] ${h.reason}`, h.evidence, "project_brief"));

@@ -2,7 +2,8 @@
 
 const path = require("path");
 const { ensureProjectDirs } = require("../utils/paths");
-const { readFileSafe, fileExists, writeFileEnsureDir } = require("../utils/fs_utils");
+const { readFileSafe, writeFileEnsureDir } = require("../utils/fs_utils");
+const { getCoreFilePath, readCoreText } = require("../utils/cache_files");
 const { formatEvidenceLevel } = require("../utils/evidence_level");
 const { appendTelemetry } = require("../utils/telemetry");
 const { loadGlobalContextCached } = require("../utils/global_context_cache");
@@ -39,11 +40,12 @@ function ensureCanonicalSpecialists(cwd, projectPaths) {
   const manifest = loadSpecialistManifest(projectPaths);
   if (manifest && Array.isArray(manifest.specialists)) return manifest;
 
-  const briefPath = path.join(projectPaths.cache, "project_brief.json");
+  const briefPath = getCoreFilePath(projectPaths, "project_brief.json");
   let brief = null;
-  if (fileExists(briefPath)) {
+  const briefRaw = readCoreText(projectPaths, "project_brief.json");
+  if (briefRaw) {
     try {
-      brief = JSON.parse(readFileSafe(briefPath) || "{}");
+      brief = JSON.parse(briefRaw || "{}");
     } catch {
       brief = null;
     }
@@ -52,7 +54,7 @@ function ensureCanonicalSpecialists(cwd, projectPaths) {
   if (!brief || !brief.summary) {
     brief = createProjectIntelligence(cwd, { context_pack: "default" });
     writeFileEnsureDir(briefPath, JSON.stringify(brief, null, 2));
-    const fingerprintPath = path.join(projectPaths.cache, "fingerprint.json");
+    const fingerprintPath = getCoreFilePath(projectPaths, "fingerprint.json");
     writeFileEnsureDir(fingerprintPath, JSON.stringify(deriveFingerprint(brief), null, 2));
   }
 

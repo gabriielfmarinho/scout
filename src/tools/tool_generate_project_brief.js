@@ -3,6 +3,7 @@
 const path = require("path");
 const { ensureProjectDirs } = require("../utils/paths");
 const { writeFileEnsureDir, readFileSafe } = require("../utils/fs_utils");
+const { getCoreFilePath } = require("../utils/cache_files");
 const {
   createProjectIntelligence,
   deriveFingerprint,
@@ -22,9 +23,9 @@ async function toolGenerateProjectBrief(args) {
   const intelligence = createProjectIntelligence(cwd, { context_pack: contextPack });
   const projectPaths = ensureProjectDirs(cwd);
 
-  const briefJsonPath = path.join(projectPaths.cache, "project_brief.json");
+  const briefJsonPath = getCoreFilePath(projectPaths, "project_brief.json");
   writeFileEnsureDir(briefJsonPath, JSON.stringify(intelligence, null, 2));
-  const fingerprintPath = path.join(projectPaths.cache, "fingerprint.json");
+  const fingerprintPath = getCoreFilePath(projectPaths, "fingerprint.json");
   writeFileEnsureDir(fingerprintPath, JSON.stringify(deriveFingerprint(intelligence), null, 2));
   const devlogPath = path.join(projectPaths.devlog, "timeline.jsonl");
   const devlogItems = parseJsonl(readFileSafe(devlogPath) || "");

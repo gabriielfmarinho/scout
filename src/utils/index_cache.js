@@ -5,6 +5,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { ensureProjectDirs } = require("./paths");
 const { listFiles, isTextFile, readFileSafe, writeFileEnsureDir } = require("./fs_utils");
+const { getCoreFilePath } = require("./cache_files");
 
 const INDEX_VERSION = 1;
 
@@ -14,7 +15,7 @@ function hashContent(content) {
 
 function getIndexPath(cwd) {
   const projectPaths = ensureProjectDirs(cwd);
-  return path.join(projectPaths.cache, "index.json");
+  return getCoreFilePath(projectPaths, "index.json");
 }
 
 function loadIndex(cwd) {

@@ -1,10 +1,10 @@
 "use strict";
 
-const path = require("path");
 const { formatToon } = require("../utils/toon");
 const { findWhoCalls, findWhatCalls, findSymbol, updateStructuralIndex } = require("../utils/structural_index");
 const { ensureProjectDirs } = require("../utils/paths");
 const { writeFileEnsureDir } = require("../utils/fs_utils");
+const { getCoreFilePath } = require("../utils/cache_files");
 const { formatEvidenceLevel } = require("../utils/evidence_level");
 const { appendTelemetry } = require("../utils/telemetry");
 const { upsertProjectSpecialistEntries, normalizeTopicName } = require("../utils/specialized_context");
@@ -26,7 +26,7 @@ async function toolQueryStructure(args) {
 
   const index = updateStructuralIndex(cwd);
   const projectPaths = ensureProjectDirs(cwd);
-  writeFileEnsureDir(path.join(projectPaths.cache, "structural_index.json"), JSON.stringify(index, null, 2));
+  writeFileEnsureDir(getCoreFilePath(projectPaths, "structural_index.json"), JSON.stringify(index, null, 2));
 
   if (mode === "who_calls") {
     const hits = findWhoCalls(cwd, target, maxResults);

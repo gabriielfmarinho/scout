@@ -5,6 +5,7 @@ const { searchProject, searchProjectHybrid } = require("../utils/search");
 const { applyContextBudget, contextPackDefaults } = require("../utils/context_budget");
 const { mapEvidenceLevel } = require("../utils/evidence_level");
 const { appendTelemetry } = require("../utils/telemetry");
+const { upsertProjectSpecialistEntries, normalizeTopicName } = require("../utils/specialized_context");
 
 async function toolSearchProject(args) {
   const started = Date.now();
@@ -14,6 +15,8 @@ async function toolSearchProject(args) {
   log("info", "search_project_root", { root: cwd });
   const query = args.query;
   const mode = args.mode || "keyword";
+  const persistToContext = args.persist_to_context !== false;
+  const persistTopic = normalizeTopicName(args.persist_topic || "flows", "flows");
   const max_results = Number(args.max_results || 50);
   const max_snippet_lines = Number(args.max_snippet_lines || 8);
   const max_files = Number(args.max_files || 2000);
@@ -33,6 +36,22 @@ async function toolSearchProject(args) {
     maxPerFile: Number(args.max_per_file || pack.maxPerFile),
   });
   const finalItems = mapEvidenceLevel(budgeted.items, evidenceLevel);
+  const persistable = finalItems.filter((r) => String(r.symbol_or_section || "").toLowerCase() !== "meta" && String(r.file || "").trim());
+  if (persistToContext && persistable.length) {
+    const entries = persistable.map((r) => ({
+      topic: persistTopic,
+      text: `${query}: search ${mode} -> ${r.file} (${r.symbol_or_section || "match"})`,
+      summary: `${query}: search ${mode} -> ${r.file} (${r.symbol_or_section || "match"})`,
+      rationale: `Search query '${query}' returned a ${mode} match in ${r.file}.`,
+      confidence: Number(r.score || 0) >= 6 ? "high" : "medium",
+      owner: "scout",
+      status: "reviewed",
+      priority: Number(r.score || 0) >= 6 ? "must" : "prefer",
+      source: "search_project",
+      evidence: r.evidence || "",
+    }));
+    upsertProjectSpecialistEntries(cwd, entries, "append");
+  }
 
   const headers = ["file", "symbol_or_section", "score", "reason", "evidence"];
   const rows = finalItems.map((r) => [r.file, r.symbol_or_section, r.score, r.reason, r.evidence]);
@@ -44,6 +63,8 @@ async function toolSearchProject(args) {
   appendTelemetry(cwd, "search_project", {
     query,
     mode,
+    persist_to_context: persistToContext,
+    persist_topic: persistTopic,
     context_pack: contextPack,
     evidence_level: evidenceLevel,
     items_before_budget: results.length,

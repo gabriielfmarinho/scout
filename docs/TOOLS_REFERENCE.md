@@ -20,7 +20,7 @@ This reference documents each tool, its parameters, and output format.
 - Input:
   - `quick` (bool, default false)
 - Output: Markdown summary + evidence references. Persists:
-  - `cache/fingerprint.json`
+  - `cache/core/fingerprint.json`
   - `docs/specialists/architecture.md`
 
 ## search_project
@@ -38,6 +38,8 @@ This reference documents each tool, its parameters, and output format.
   - `max_files` (int, default 2000)
   - `max_file_bytes` (int, default 524288)
   - `max_ms` (int, default 20000)
+  - `persist_to_context` (bool, default `true`) append search findings into project specialist context
+  - `persist_topic` (string, default `flows`) specialist topic used when persisting
 - Output: TOON table: `file | symbol_or_section | score | reason | evidence`
 
 ## analyze_impact
@@ -59,7 +61,7 @@ This reference documents each tool, its parameters, and output format.
 - Input:
   - `context_pack` (default|debug|refactor|review, default `default`)
 - Output: Markdown report. Persists:
-  - `cache/project_brief.json`
+  - `cache/core/project_brief.json`
   - `docs/active-context.md` (project brief router/index)
   - `docs/specialists/architecture.md`
 

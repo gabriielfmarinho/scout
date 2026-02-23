@@ -3,8 +3,6 @@
 const path = require("path");
 const os = require("os");
 const { readFileSafe, writeFileEnsureDir, fileExists } = require("./fs_utils");
-const { parseRule } = require("./global_rules");
-const { formatEvidence } = require("./snippet");
 const { computeQuality } = require("./context_quality");
 
 const MANIFEST_VERSION = 1;
@@ -45,29 +43,6 @@ function normalizeTopics(topics) {
   if (!Array.isArray(topics) || !topics.length) return ["all"];
   const out = topics.map((t) => normalizeTopicName(t, "all")).filter(Boolean);
   return out.length ? out : ["all"];
-}
-
-function parseLegacyActiveContext(content, filePath) {
-  if (!content) return [];
-  const lines = String(content).split(/\r?\n/);
-  const entries = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line.trim().startsWith("-")) continue;
-    const parsed = parseRule(line, "prefer");
-    if (!parsed.text) continue;
-    entries.push({
-      id: `legacy-${i + 1}`,
-      text: parsed.text,
-      priority: parsed.priority,
-      topic: classifyTopic(parsed.text),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      evidence: formatEvidence(filePath, i + 1, i + 1, line.trim()),
-      source: "legacy-active-context",
-    });
-  }
-  return entries;
 }
 
 function uniqueEntries(entries) {
@@ -182,9 +157,7 @@ function writeGlobalEntries(entries) {
 function ensureGlobalSpecialists() {
   const manifest = loadGlobalManifest();
   if (manifest && Array.isArray(manifest.specialists)) return manifest;
-  const legacyPath = getGlobalContextPath();
-  const legacyEntries = parseLegacyActiveContext(readFileSafe(legacyPath) || "", legacyPath);
-  return writeGlobalEntries(legacyEntries).manifest;
+  return writeGlobalEntries([]).manifest;
 }
 
 function loadGlobalEntries(options = {}) {

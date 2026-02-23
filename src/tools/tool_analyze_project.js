@@ -3,6 +3,7 @@
 const path = require("path");
 const { ensureProjectDirs } = require("../utils/paths");
 const { writeFileEnsureDir, readFileSafe } = require("../utils/fs_utils");
+const { getCoreFilePath, readCoreText } = require("../utils/cache_files");
 const {
   createProjectIntelligence,
   deriveFingerprint,
@@ -21,10 +22,10 @@ async function toolAnalyzeProject(args) {
   const brief = createProjectIntelligence(cwd, { context_pack: "default" });
   const fingerprint = deriveFingerprint(brief);
 
-  const fingerprintPath = path.join(projectPaths.cache, "fingerprint.json");
+  const fingerprintPath = getCoreFilePath(projectPaths, "fingerprint.json");
   writeFileEnsureDir(fingerprintPath, JSON.stringify(fingerprint, null, 2));
-  const structuralPath = path.join(projectPaths.cache, "structural_index.json");
-  const structuralRaw = readFileSafe(structuralPath);
+  const structuralPath = getCoreFilePath(projectPaths, "structural_index.json");
+  const structuralRaw = readCoreText(projectPaths, "structural_index.json");
   if (!structuralRaw) {
     writeFileEnsureDir(structuralPath, JSON.stringify({
       version: 1,
@@ -36,7 +37,7 @@ async function toolAnalyzeProject(args) {
       updatedAt: new Date().toISOString(),
     }, null, 2));
   }
-  const briefJsonPath = path.join(projectPaths.cache, "project_brief.json");
+  const briefJsonPath = getCoreFilePath(projectPaths, "project_brief.json");
   writeFileEnsureDir(briefJsonPath, JSON.stringify(brief, null, 2));
 
   const devlogPath = path.join(projectPaths.devlog, "timeline.jsonl");

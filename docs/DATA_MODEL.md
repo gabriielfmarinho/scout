@@ -18,7 +18,7 @@ Each line is a JSON object:
 }
 ```
 
-## fingerprint.json
+## cache/core/fingerprint.json
 Summary of project signals:
 ```json
 {
@@ -41,9 +41,9 @@ Summary of project signals:
   ]
 }
 ```
-`fingerprint.json` is derived from `project_brief.json` in the current model.
+`cache/core/fingerprint.json` is derived from `cache/core/project_brief.json` in the current model.
 
-## structural_index.json
+## cache/core/structural_index.json
 Incremental structural index:
 ```json
 {
@@ -66,7 +66,7 @@ Incremental structural index:
 }
 ```
 
-## project_brief.json
+## cache/core/project_brief.json
 Structured Project Intelligence snapshot:
 ```json
 {
@@ -87,7 +87,7 @@ Structured Project Intelligence snapshot:
   "evidence": []
 }
 ```
-`project_brief.json` is the canonical artifact; other summaries should be derived from it.
+`cache/core/project_brief.json` is the canonical artifact; other summaries should be derived from it.
 
 ## context_manifest.json
 Progressive disclosure index for specialist context files:
@@ -175,7 +175,7 @@ Canonical global context specialist file:
 }
 ```
 
-## project_intelligence_files.json
+## cache/core/project_intelligence_files.json
 Incremental file-level intelligence cache used to avoid full rescans:
 ```json
 {
@@ -196,5 +196,5 @@ Incremental file-level intelligence cache used to avoid full rescans:
 }
 ```
 
-## telemetry.jsonl
+## cache/core/telemetry.jsonl
 One JSON object per tool execution with context-budget and latency metrics.

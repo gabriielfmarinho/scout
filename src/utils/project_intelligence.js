@@ -8,6 +8,7 @@ const { formatEvidence } = require("./snippet");
 const { analyzeProject } = require("./analyze");
 const { updateStructuralIndex } = require("./structural_index");
 const { ensureProjectDirs } = require("./paths");
+const { getCoreFilePath, readCoreJson } = require("./cache_files");
 
 const MAX_FILE_BYTES = 1024 * 1024;
 const INTEL_CACHE_VERSION = 1;
@@ -23,7 +24,7 @@ function lineEvidence(cwd, filePath, lineNum, line) {
 
 function getIntelCachePath(cwd) {
   const projectPaths = ensureProjectDirs(cwd);
-  return path.join(projectPaths.cache, "project_intelligence_files.json");
+  return getCoreFilePath(projectPaths, "project_intelligence_files.json");
 }
 
 function loadIntelCache(cwd) {
@@ -156,6 +157,17 @@ function extractConventionsFromFile(relFile) {
   return { conventions, markers };
 }
 
+function shouldAnalyzeBehavioralFile(relFile) {
+  const file = String(relFile || "").replace(/\\/g, "/").toLowerCase();
+  if (!file) return false;
+  if (file.startsWith("docs/")) return false;
+  if (file.startsWith("test/") || file.startsWith("tests/")) return false;
+  if (file.includes("/__tests__/")) return false;
+  if (/\.md$/i.test(file)) return false;
+  if (/(\.test\.|\.spec\.)/.test(file)) return false;
+  return true;
+}
+
 function extractHotspotsFromLines(cwd, relFile, lines) {
   const hotspots = [];
   const loc = lines.length;
@@ -232,11 +244,12 @@ function analyzeFileIntelligence(cwd, relFile, hash) {
   }
 
   const lines = content.split(/\r?\n/);
-  const flow = extractFlowsFromLines(cwd, relFile, lines);
-  const integ = extractIntegrationsFromLines(cwd, relFile, lines);
-  const runtime = extractRuntimeConfigsFromLines(cwd, relFile, lines);
   const conv = extractConventionsFromFile(relFile);
-  const hot = extractHotspotsFromLines(cwd, relFile, lines);
+  const behavioral = shouldAnalyzeBehavioralFile(relFile);
+  const flow = behavioral ? extractFlowsFromLines(cwd, relFile, lines) : [];
+  const integ = behavioral ? extractIntegrationsFromLines(cwd, relFile, lines) : [];
+  const runtime = behavioral ? extractRuntimeConfigsFromLines(cwd, relFile, lines) : [];
+  const hot = behavioral ? extractHotspotsFromLines(cwd, relFile, lines) : [];
 
   return {
     hash,
@@ -358,16 +371,9 @@ function inferSummaryFromEvidence(evidence) {
 }
 
 function loadPreviousBriefSummary(cwd) {
-  try {
-    const projectPaths = ensureProjectDirs(cwd);
-    const briefPath = path.join(projectPaths.cache, "project_brief.json");
-    const raw = readFileSafe(briefPath);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && parsed.summary ? parsed.summary : {};
-  } catch {
-    return {};
-  }
+  const projectPaths = ensureProjectDirs(cwd);
+  const parsed = readCoreJson(projectPaths, "project_brief.json", {});
+  return parsed && parsed.summary ? parsed.summary : {};
 }
 
 function createProjectIntelligence(cwd, options = {}) {

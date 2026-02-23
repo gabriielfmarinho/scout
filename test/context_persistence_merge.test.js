@@ -9,6 +9,7 @@ const { toolGenerateProjectBrief } = require("../src/tools/tool_generate_project
 const { toolAnalyzeProject } = require("../src/tools/tool_analyze_project");
 const { toolAnalyzeImpact } = require("../src/tools/tool_analyze_impact");
 const { toolQueryStructure } = require("../src/tools/tool_query_structure");
+const { toolSearchProject } = require("../src/tools/tool_search_project");
 const { toolUpdateProjectContext } = require("../src/tools/tool_update_project_context");
 const { toolGetContextBundle } = require("../src/tools/tool_get_context_bundle");
 const { ensureProjectDirs } = require("../src/utils/paths");
@@ -161,6 +162,34 @@ function handler() {
   const out = await toolGetContextBundle({ topics: ["flow-investigation"], include_preferential: true, page_size: 50 });
   assert.match(out, /flow-investigation/);
   assert.match(out, /who_calls processPayment/);
+
+  process.chdir(prevCwd);
+  if (prevEnv === undefined) delete process.env.SCOUT_PROJECT_ROOT;
+  else process.env.SCOUT_PROJECT_ROOT = prevEnv;
+});
+
+test("search_project persists term analysis to context by default", async () => {
+  const tmp = makeTempDir();
+  const prevCwd = process.cwd();
+  const prevEnv = process.env.SCOUT_PROJECT_ROOT;
+  process.env.SCOUT_PROJECT_ROOT = tmp;
+  process.chdir(tmp);
+
+  fs.writeFileSync(path.join(tmp, "package.json"), JSON.stringify({ name: "demo" }), "utf8");
+  fs.mkdirSync(path.join(tmp, "src"), { recursive: true });
+  fs.writeFileSync(path.join(tmp, "src", "orders.js"), "function calculateTotal() {}\ncalculateTotal();\n", "utf8");
+
+  await toolGenerateProjectBrief({ context_pack: "default" });
+  await toolSearchProject({
+    query: "calculateTotal",
+    mode: "hybrid",
+    max_results: 10,
+    persist_topic: "flow-investigation",
+  });
+
+  const out = await toolGetContextBundle({ topics: ["flow-investigation"], include_preferential: true, page_size: 50 });
+  assert.match(out, /calculateTotal/);
+  assert.match(out, /search hybrid/);
 
   process.chdir(prevCwd);
   if (prevEnv === undefined) delete process.env.SCOUT_PROJECT_ROOT;
