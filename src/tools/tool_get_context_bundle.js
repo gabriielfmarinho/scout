@@ -2,32 +2,65 @@
 
 const path = require("path");
 const { ensureProjectDirs } = require("../utils/paths");
-const { readFileSafe, fileExists } = require("../utils/fs_utils");
-const { analyzeProject } = require("../utils/analyze");
-const { snippetWithLines, formatEvidence } = require("../utils/snippet");
-const { writeFileEnsureDir } = require("../utils/fs_utils");
-const { applyContextBudget, contextPackDefaults } = require("../utils/context_budget");
+const { readFileSafe, fileExists, writeFileEnsureDir } = require("../utils/fs_utils");
 const { formatEvidenceLevel } = require("../utils/evidence_level");
 const { appendTelemetry } = require("../utils/telemetry");
 const { loadGlobalContextCached } = require("../utils/global_context_cache");
+const { TOPICS, parseJsonl, normalizeTopicName, loadSpecialistItems, loadSpecialistManifest, writeSpecialistContext } = require("../utils/specialized_context");
+const { GLOBAL_TOPICS, normalizeTopicName: normalizeGlobalTopicName, getAvailableGlobalTopics } = require("../utils/global_specialized_context");
+const { createProjectIntelligence, deriveFingerprint, renderArchitectureMarkdown } = require("../utils/project_intelligence");
 
-function loadActiveContext(docsPath) {
-  const filePath = path.join(docsPath, "active-context.md");
-  const content = readFileSafe(filePath);
-  if (!content) return null;
-  const lines = content.split(/\r?\n/);
-  const items = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.trim().startsWith("-")) {
-      const snippet = snippetWithLines(filePath, i + 1, i + 1);
-      items.push({
-        text: line.replace(/^\s*-\s*/, ""),
-        evidence: formatEvidence(filePath, snippet.start, snippet.end, snippet.text),
-      });
+function encodeCursor(payload) {
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
+}
+
+function decodeCursor(cursor) {
+  if (!cursor) return null;
+  try {
+    return JSON.parse(Buffer.from(String(cursor), "base64").toString("utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function normalizeTopics(topics) {
+  if (!Array.isArray(topics) || !topics.length) return ["overview"];
+  const normalized = topics.map((t) => normalizeTopicName(t, "overview")).filter(Boolean);
+  return normalized.length ? normalized : ["overview"];
+}
+
+function normalizeGlobalTopics(topics) {
+  if (!Array.isArray(topics) || !topics.length) return ["all"];
+  const normalized = topics.map((t) => normalizeGlobalTopicName(t, "all")).filter(Boolean);
+  return normalized.length ? normalized : ["all"];
+}
+
+function ensureCanonicalSpecialists(cwd, projectPaths) {
+  const manifest = loadSpecialistManifest(projectPaths);
+  if (manifest && Array.isArray(manifest.specialists)) return manifest;
+
+  const briefPath = path.join(projectPaths.cache, "project_brief.json");
+  let brief = null;
+  if (fileExists(briefPath)) {
+    try {
+      brief = JSON.parse(readFileSafe(briefPath) || "{}");
+    } catch {
+      brief = null;
     }
   }
-  return items;
+
+  if (!brief || !brief.summary) {
+    brief = createProjectIntelligence(cwd, { context_pack: "default" });
+    writeFileEnsureDir(briefPath, JSON.stringify(brief, null, 2));
+    const fingerprintPath = path.join(projectPaths.cache, "fingerprint.json");
+    writeFileEnsureDir(fingerprintPath, JSON.stringify(deriveFingerprint(brief), null, 2));
+    const architecturePath = path.join(projectPaths.docs, "architecture.md");
+    writeFileEnsureDir(architecturePath, renderArchitectureMarkdown(brief));
+  }
+
+  const devlogPath = path.join(projectPaths.devlog, "timeline.jsonl");
+  const devlogItems = parseJsonl(readFileSafe(devlogPath) || "");
+  return writeSpecialistContext(cwd, brief, devlogItems).manifest;
 }
 
 async function toolGetContextBundle(args) {
@@ -37,68 +70,84 @@ async function toolGetContextBundle(args) {
   const cwd = resolveProjectRoot();
   log("info", "get_context_bundle_root", { root: cwd });
   const projectPaths = ensureProjectDirs(cwd);
-  const maxItems = Number(args.max_items || 50);
+  const pageSize = Number(args.page_size || args.max_items || 50);
   const contextPack = args.context_pack || "default";
-  const evidenceLevel = args.evidence_level || "standard";
+  const evidenceLevel = args.evidence_level || "full";
   const includePreferential = args.include_preferential !== false;
-  const pack = contextPackDefaults(contextPack);
+  const topics = normalizeTopics(args.topics);
+  const globalTopics = normalizeGlobalTopics(args.global_topics);
+  ensureCanonicalSpecialists(cwd, projectPaths);
 
-  const fingerprintPath = path.join(projectPaths.cache, "fingerprint.json");
-  if (!fileExists(fingerprintPath)) {
-    const analysis = analyzeProject(cwd, true);
-    writeFileEnsureDir(fingerprintPath, JSON.stringify(analysis, null, 2));
-  }
-
-  let items = loadActiveContext(projectPaths.docs);
-  if (!items) {
-    const fallback = [
-      "No active-context.md found. Use analyze_project to generate architecture summary and then compress_context to create active context.",
-    ];
-    const fallbackPath = path.join(projectPaths.docs, "active-context.md");
-    writeFileEnsureDir(fallbackPath, fallback.map((l) => `- ${l}`).join("\n") + "\n");
-    items = loadActiveContext(projectPaths.docs) || [];
-  }
-
-  const globalItems = loadGlobalContextCached(false);
+  const globalItems = loadGlobalContextCached(false, { topics: globalTopics });
   const mandatoryGlobal = globalItems.filter((g) => g.priority === "must");
   const preferredGlobal = globalItems.filter((g) => g.priority !== "must");
+
+  const specialist = loadSpecialistItems(projectPaths, topics);
+  const specialistItems = specialist.items.map((item) => ({
+    text: item.text,
+    evidence: item.evidence,
+    topic: item.topic,
+  }));
+
   const combined = [
-    ...(includePreferential ? preferredGlobal : []),
-    ...items,
+    ...mandatoryGlobal.map((i) => ({ ...i, topic: "global" })),
+    ...(includePreferential ? preferredGlobal.map((i) => ({ ...i, topic: "global" })) : []),
+    ...specialistItems,
   ];
-  const budgeted = applyContextBudget(
-    combined.map((i) => ({ ...i, evidence: i.evidence })),
-    {
-      maxItems: Math.min(maxItems, Number(args.max_budget_items || pack.maxItems)),
-      maxChars: Number(args.max_context_chars || pack.maxChars),
-      maxPerFile: Number(args.max_per_file || pack.maxPerFile),
-    }
-  );
-  const limited = [...mandatoryGlobal, ...budgeted.items];
+
+  const cursor = decodeCursor(args.cursor);
+  const offset = cursor && Number.isInteger(cursor.offset) && cursor.offset >= 0 ? cursor.offset : 0;
+  const validPageSize = Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 50;
+  const page = combined.slice(offset, offset + validPageSize);
+  const nextOffset = offset + page.length;
+  const hasMore = nextOffset < combined.length;
+  const nextCursor = hasMore ? encodeCursor({ offset: nextOffset }) : "";
+
   const lines = [];
   lines.push("# Context Bundle");
   lines.push("");
   lines.push(`- meta: context_pack=${contextPack}`);
   lines.push(`- meta: evidence_level=${evidenceLevel}`);
+  lines.push(`- meta: progressive_disclosure=true`);
+  lines.push(`- meta: topics=${topics.join(",")}`);
+  lines.push(`- meta: global_topics=${globalTopics.join(",")}`);
   lines.push(`- meta: include_preferential=${includePreferential}`);
   lines.push(`- meta: mandatory_global_count=${mandatoryGlobal.length}`);
-  if (budgeted.truncated) {
-    lines.push(`- meta: context budget truncated kept=${limited.length} total=${budgeted.originalCount + mandatoryGlobal.length}`);
+  lines.push(`- meta: returned_items=${page.length}`);
+  lines.push(`- meta: total_items=${combined.length}`);
+  lines.push(`- meta: has_more=${hasMore}`);
+  if (hasMore) {
+    lines.push(`- meta: next_cursor=${nextCursor}`);
   }
-  for (const item of limited) {
+  if (specialist.manifest && Array.isArray(specialist.manifest.specialists)) {
+    const available = specialist.manifest.specialists.map((s) => s.topic).join(",");
+    lines.push(`- meta: available_topics=${available}`);
+  } else {
+    lines.push(`- meta: available_topics=${TOPICS.join(",")}`);
+  }
+  const availableGlobal = getAvailableGlobalTopics();
+  lines.push(`- meta: available_global_topics=${(availableGlobal.length ? availableGlobal : GLOBAL_TOPICS).join(",")}`);
+
+  for (const item of page) {
     const prefix = item.priority === "must" ? "[must] " : "";
-    lines.push(`- ${prefix}${item.text}`);
+    const topicPrefix = item.topic ? `[${item.topic}] ` : "";
+    const quality = Number.isFinite(item.quality_score) ? ` [q=${item.quality_score}]` : "";
+    lines.push(`- ${prefix}${topicPrefix}${item.text}${quality}`);
     lines.push(`  Evidence: ${formatEvidenceLevel(item.evidence, evidenceLevel)}`);
   }
   appendTelemetry(cwd, "get_context_bundle", {
     context_pack: contextPack,
     evidence_level: evidenceLevel,
-    items_before_budget: combined.length + mandatoryGlobal.length,
-    items_after_budget: limited.length,
+    progressive_disclosure: true,
+    topics,
+    global_topics: globalTopics,
+    offset,
+    page_size: validPageSize,
+    items_total: combined.length,
+    items_returned: page.length,
     include_preferential: includePreferential,
     mandatory_global_count: mandatoryGlobal.length,
-    truncated: budgeted.truncated,
-    truncation_rate: budgeted.originalCount > 0 ? Number(((budgeted.originalCount - budgeted.items.length) / budgeted.originalCount).toFixed(4)) : 0,
+    has_more: hasMore,
     latency_ms: Date.now() - started,
   });
 

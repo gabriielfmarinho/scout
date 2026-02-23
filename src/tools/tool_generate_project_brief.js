@@ -2,12 +2,13 @@
 
 const path = require("path");
 const { ensureProjectDirs } = require("../utils/paths");
-const { writeFileEnsureDir } = require("../utils/fs_utils");
+const { writeFileEnsureDir, readFileSafe } = require("../utils/fs_utils");
 const {
   createProjectIntelligence,
   deriveFingerprint,
   renderArchitectureMarkdown,
 } = require("../utils/project_intelligence");
+const { parseJsonl, writeSpecialistContext } = require("../utils/specialized_context");
 const { appendTelemetry } = require("../utils/telemetry");
 
 function list(items, key) {
@@ -32,6 +33,9 @@ async function toolGenerateProjectBrief(args) {
   writeFileEnsureDir(fingerprintPath, JSON.stringify(deriveFingerprint(intelligence), null, 2));
   const architecturePath = path.join(projectPaths.docs, "architecture.md");
   writeFileEnsureDir(architecturePath, renderArchitectureMarkdown(intelligence));
+  const devlogPath = path.join(projectPaths.devlog, "timeline.jsonl");
+  const devlogItems = parseJsonl(readFileSafe(devlogPath) || "");
+  const specialist = writeSpecialistContext(cwd, intelligence, devlogItems);
 
   const md = [];
   md.push("# Project Brief");
@@ -85,6 +89,8 @@ async function toolGenerateProjectBrief(args) {
   out.push(`Persisted: ${briefMdPath}`);
   out.push(`Persisted: ${fingerprintPath} (derived)`);
   out.push(`Persisted: ${architecturePath} (derived)`);
+  out.push(`Persisted: ${specialist.manifestPath} (progressive disclosure index)`);
+  out.push(`Persisted: ${specialist.activePath} (topic router)`);
   appendTelemetry(cwd, "generate_project_brief", {
     context_pack: contextPack,
     flows: intelligence.flows.length,

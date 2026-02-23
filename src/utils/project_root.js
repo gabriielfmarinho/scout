@@ -7,6 +7,9 @@ const { readActiveProject, writeActiveProject } = require("./active_project");
 
 const MARKERS = new Set([
   ".git",
+  ".idea",
+  ".vscode",
+  ".scout-project",
   ".scout",
   "package.json",
   "pnpm-workspace.yaml",
@@ -37,20 +40,29 @@ function hasProjectMarkers(dir) {
 
 function readScoutMarker(dir) {
   const markerPath = path.join(dir, ".scout");
+  return readProjectMarkerFile(markerPath, dir);
+}
+
+function readScoutProjectMarker(dir) {
+  const markerPath = path.join(dir, ".scout-project");
+  return readProjectMarkerFile(markerPath, dir);
+}
+
+function readProjectMarkerFile(markerPath, baseDir) {
   try {
     const stat = fs.statSync(markerPath);
     if (!stat.isFile()) return null;
     const raw = fs.readFileSync(markerPath, "utf8").trim();
-    if (!raw) return dir;
+    if (!raw) return baseDir;
     try {
       const data = JSON.parse(raw);
       if (data && typeof data.root === "string") {
-        return path.resolve(dir, data.root);
+        return path.resolve(baseDir, data.root);
       }
     } catch {
       // ignore parse errors, treat as marker-only
     }
-    return dir;
+    return baseDir;
   } catch {
     return null;
   }
@@ -59,6 +71,8 @@ function readScoutMarker(dir) {
 function findScoutMarkerUpwards(startDir, maxDepth) {
   let current = path.resolve(startDir);
   for (let i = 0; i < maxDepth; i++) {
+    const custom = readScoutProjectMarker(current);
+    if (custom) return custom;
     const found = readScoutMarker(current);
     if (found) return found;
     const parent = path.dirname(current);
@@ -76,7 +90,7 @@ function findSingleProjectUnder(root, depth) {
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       const full = path.join(root, entry.name);
-      if (readScoutMarker(full)) {
+      if (readScoutProjectMarker(full) || readScoutMarker(full)) {
         candidates.push(full);
       } else if (hasProjectMarkers(full)) {
         candidates.push(full);
@@ -101,20 +115,9 @@ function resolveProjectRoot() {
     return root;
   }
 
-  const active = readActiveProject();
-  if (active && active.root) {
-    try {
-      if (fs.statSync(active.root).isDirectory()) {
-        return path.resolve(active.root);
-      }
-    } catch {
-      // ignore
-    }
-  }
-
   const cwd = process.cwd();
 
-  const markerRoot = findScoutMarkerUpwards(cwd, 5);
+  const markerRoot = findScoutMarkerUpwards(cwd, 8);
   if (markerRoot) {
     writeActiveProject(markerRoot);
     return markerRoot;
@@ -145,7 +148,25 @@ function resolveProjectRoot() {
     return root;
   }
 
+  const active = readActiveProject();
+  if (active && active.root) {
+    try {
+      if (fs.statSync(active.root).isDirectory()) {
+        return path.resolve(active.root);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   return cwd;
 }
 
-module.exports = { resolveProjectRoot, hasProjectMarkers, findSingleProjectUnder, readScoutMarker, findScoutMarkerUpwards };
+module.exports = {
+  resolveProjectRoot,
+  hasProjectMarkers,
+  findSingleProjectUnder,
+  readScoutMarker,
+  readScoutProjectMarker,
+  findScoutMarkerUpwards,
+};

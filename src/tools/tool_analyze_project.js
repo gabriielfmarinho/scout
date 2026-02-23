@@ -8,6 +8,7 @@ const {
   deriveFingerprint,
   renderArchitectureMarkdown,
 } = require("../utils/project_intelligence");
+const { parseJsonl, writeSpecialistContext } = require("../utils/specialized_context");
 const { appendTelemetry } = require("../utils/telemetry");
 
 async function toolAnalyzeProject(args) {
@@ -40,6 +41,9 @@ async function toolAnalyzeProject(args) {
 
   const architecturePath = path.join(projectPaths.docs, "architecture.md");
   writeFileEnsureDir(architecturePath, renderArchitectureMarkdown(brief));
+  const devlogPath = path.join(projectPaths.devlog, "timeline.jsonl");
+  const devlogItems = parseJsonl(readFileSafe(devlogPath) || "");
+  const specialist = writeSpecialistContext(cwd, brief, devlogItems);
 
   const out = [];
   out.push("# Project Analysis");
@@ -68,6 +72,8 @@ async function toolAnalyzeProject(args) {
   out.push(`Persisted: ${architecturePath}`);
   out.push(`Persisted: ${structuralPath}`);
   out.push(`Persisted: ${briefJsonPath}`);
+  out.push(`Persisted: ${specialist.manifestPath}`);
+  out.push(`Persisted: ${specialist.activePath}`);
   appendTelemetry(cwd, "analyze_project", {
     quick: Boolean(args.quick),
     summary: brief.summary,

@@ -23,9 +23,35 @@ test("resolveProjectRoot finds .scout marker", () => {
   try { fs.unlinkSync(activePath); } catch {}
 
   const prev = process.cwd();
+  const prevEnv = process.env.SCOUT_PROJECT_ROOT;
+  delete process.env.SCOUT_PROJECT_ROOT;
   process.chdir(subdir);
   const root = resolveProjectRoot();
   process.chdir(prev);
+  if (prevEnv === undefined) delete process.env.SCOUT_PROJECT_ROOT;
+  else process.env.SCOUT_PROJECT_ROOT = prevEnv;
+
+  assert.equal(root, project);
+});
+
+test("resolveProjectRoot finds .scout-project marker", () => {
+  const tmp = makeTempDir();
+  const project = path.join(tmp, "proj-custom");
+  const subdir = path.join(project, "subdir");
+  fs.mkdirSync(subdir, { recursive: true });
+  fs.writeFileSync(path.join(project, ".scout-project"), "");
+
+  const activePath = getActiveProjectPath();
+  try { fs.unlinkSync(activePath); } catch {}
+
+  const prev = process.cwd();
+  const prevEnv = process.env.SCOUT_PROJECT_ROOT;
+  delete process.env.SCOUT_PROJECT_ROOT;
+  process.chdir(subdir);
+  const root = resolveProjectRoot();
+  process.chdir(prev);
+  if (prevEnv === undefined) delete process.env.SCOUT_PROJECT_ROOT;
+  else process.env.SCOUT_PROJECT_ROOT = prevEnv;
 
   assert.equal(root, project);
 });

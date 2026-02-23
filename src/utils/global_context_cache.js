@@ -1,41 +1,18 @@
 "use strict";
 
-const path = require("path");
-const os = require("os");
-const { readFileSafe } = require("./fs_utils");
-const { formatEvidence } = require("./snippet");
-const { parseRule } = require("./global_rules");
+const { getGlobalContextPath, ensureGlobalSpecialists, loadGlobalEntries } = require("./global_specialized_context");
 
 let cachedItems = null;
 
-function getGlobalContextPath() {
-  return path.join(os.homedir(), ".engineering-ai", "global", "active-context.md");
-}
-
-function parseGlobalContext(content, filePath) {
-  if (!content) return [];
-  const lines = content.split(/\r?\n/);
-  const items = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line.trim().startsWith("-")) continue;
-    const parsed = parseRule(line, "prefer");
-    if (!parsed.text) continue;
-    items.push({
-      text: parsed.text,
-      priority: parsed.priority,
-      evidence: formatEvidence(filePath, i + 1, i + 1, line.trim()),
-    });
+function loadGlobalContextCached(forceReload = false, options = {}) {
+  if ((!cachedItems || forceReload)) {
+    ensureGlobalSpecialists();
+    cachedItems = loadGlobalEntries({ topics: ["all"] });
   }
-  return items;
-}
-
-function loadGlobalContextCached(forceReload = false) {
-  if (cachedItems && !forceReload) return cachedItems;
-  const filePath = getGlobalContextPath();
-  const content = readFileSafe(filePath);
-  cachedItems = parseGlobalContext(content, filePath);
-  return cachedItems;
+  const topics = Array.isArray(options.topics) ? options.topics : ["all"];
+  if (topics.includes("all")) return cachedItems;
+  const wanted = new Set(topics);
+  return cachedItems.filter((item) => wanted.has(item.topic));
 }
 
 function invalidateGlobalContextCache() {

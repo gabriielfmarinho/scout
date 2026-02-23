@@ -7,7 +7,6 @@ const { readFileSafe, writeFileEnsureDir } = require("./fs_utils");
 const { formatEvidence } = require("./snippet");
 const { analyzeProject } = require("./analyze");
 const { updateStructuralIndex } = require("./structural_index");
-const { applyContextBudget, contextPackDefaults } = require("./context_budget");
 const { ensureProjectDirs } = require("./paths");
 
 const MAX_FILE_BYTES = 1024 * 1024;
@@ -375,14 +374,6 @@ function createProjectIntelligence(cwd, options = {}) {
   if (!markers.hasPrettier) conventions.push({ convention: "No Prettier config detected", evidence: "repo:1-1: missing format config" });
   hotspots.push(...buildStructuralHotspots(struct));
 
-  const pack = options.context_pack || "default";
-  const budget = contextPackDefaults(pack);
-  const bFlows = applyContextBudget(flows, budget).items;
-  const bIntegrations = applyContextBudget(integrations, budget).items;
-  const bRuntime = applyContextBudget(runtimeConfigs, budget).items;
-  const bConventions = applyContextBudget(conventions, budget).items;
-  const bHotspots = applyContextBudget(hotspots, budget).items;
-
   return {
     generatedAt: new Date().toISOString(),
     canonical: true,
@@ -408,11 +399,11 @@ function createProjectIntelligence(cwd, options = {}) {
       cache_file: getIntelCachePath(cwd),
       latency_ms: Date.now() - started,
     },
-    flows: bFlows,
-    integrations: bIntegrations,
-    runtimeConfigs: bRuntime,
-    conventions: bConventions,
-    hotspots: bHotspots,
+    flows,
+    integrations,
+    runtimeConfigs,
+    conventions,
+    hotspots,
     evidence: analysis.evidence || [],
   };
 }
@@ -480,17 +471,21 @@ function buildActiveContextFromBrief(brief, devlogItems, maxBullets) {
   lines.push(`- Frameworks: ${(s.frameworks || []).join(", ") || "unknown"}`);
   lines.push(`- Architecture hints: ${(s.architectureHints || []).join(", ") || "none detected"}`);
 
-  for (const f of (brief.flows || []).slice(0, 5)) {
+  for (const f of (brief.flows || [])) {
     lines.push(`- Flow: ${f.name}`);
   }
-  for (const h of (brief.hotspots || []).slice(0, 5)) {
+  for (const h of (brief.hotspots || [])) {
     lines.push(`- Risk (${h.risk}): ${h.reason}`);
   }
 
-  for (const item of (devlogItems || []).slice(-10)) {
+  for (const item of (devlogItems || [])) {
     if (item && item.summary) lines.push(`- Recent: ${item.summary}`);
   }
-  return lines.slice(0, maxBullets).join("\n") + "\n";
+  const limit = Number(maxBullets || 0);
+  if (limit > 0 && Number.isFinite(limit)) {
+    return lines.slice(0, limit).join("\n") + "\n";
+  }
+  return lines.join("\n") + "\n";
 }
 
 module.exports = {

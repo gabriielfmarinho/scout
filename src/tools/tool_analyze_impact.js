@@ -6,6 +6,7 @@ const { findWhoCalls, findSymbol } = require("../utils/structural_index");
 const { applyContextBudget, contextPackDefaults } = require("../utils/context_budget");
 const { mapEvidenceLevel } = require("../utils/evidence_level");
 const { appendTelemetry } = require("../utils/telemetry");
+const { upsertProjectSpecialistEntries, normalizeTopicName } = require("../utils/specialized_context");
 
 function riskFromScore(score) {
   if (score >= 6) return "high";
@@ -20,6 +21,8 @@ async function toolAnalyzeImpact(args) {
   const cwd = resolveProjectRoot();
   log("info", "analyze_impact_root", { root: cwd });
   const target = args.target;
+  const persistToContext = args.persist_to_context === true;
+  const persistTopic = normalizeTopicName(args.persist_topic || "flows", "flows");
   const max_results = Number(args.max_results || 50);
   const contextPack = args.context_pack || "default";
   const evidenceLevel = args.evidence_level || "standard";
@@ -55,6 +58,22 @@ async function toolAnalyzeImpact(args) {
   });
   const finalItems = mapEvidenceLevel(budgeted.items, evidenceLevel);
 
+  if (persistToContext && finalItems.length) {
+    const entries = finalItems.map((hit) => ({
+      topic: persistTopic,
+      text: `${target}: ${hit.impact} (${hit.risk}) -> ${hit.file || "unknown file"}`,
+      summary: `${target}: ${hit.impact} (${hit.risk}) -> ${hit.file || "unknown file"}`,
+      rationale: `Impact analysis for '${target}' identified ${hit.impact} with ${hit.risk} risk.`,
+      confidence: hit.risk === "high" ? "high" : "medium",
+      owner: "scout",
+      status: "reviewed",
+      priority: hit.risk === "high" ? "must" : "prefer",
+      source: "analysis_impact",
+      evidence: hit.evidence || "",
+    }));
+    upsertProjectSpecialistEntries(cwd, entries, "append");
+  }
+
   const rows = finalItems.map((hit) => [
     hit.file,
     hit.impact,
@@ -68,6 +87,8 @@ async function toolAnalyzeImpact(args) {
   }
   appendTelemetry(cwd, "analyze_impact", {
     target,
+    persist_to_context: persistToContext,
+    persist_topic: persistTopic,
     context_pack: contextPack,
     evidence_level: evidenceLevel,
     items_before_budget: merged.length,

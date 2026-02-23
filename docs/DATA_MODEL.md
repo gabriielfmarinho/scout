@@ -89,6 +89,92 @@ Structured Project Intelligence snapshot:
 ```
 `project_brief.json` is the canonical artifact; other summaries should be derived from it.
 
+## context_manifest.json
+Progressive disclosure index for specialist context files:
+```json
+{
+  "version": 1,
+  "generatedAt": "2026-02-23T12:34:56.789Z",
+  "source": "project_brief.json",
+  "specialists": [
+    {
+      "topic": "overview",
+      "count": 12,
+      "cache_path": "/home/user/.engineering-ai/projects/demo/cache/specialists/overview.json",
+      "doc_path": "/home/user/.engineering-ai/projects/demo/docs/specialists/overview.md"
+    }
+  ]
+}
+```
+
+## cache/specialists/<topic>.json
+Canonical specialist payload for lossless retrieval (one file per topic):
+```json
+{
+  "topic": "flows",
+  "items": [
+    {
+      "topic": "flows",
+      "text": "http: GET /health",
+      "summary": "http: GET /health",
+      "rationale": "Derived from project analysis",
+      "evidence": "src/api.js:10-10: app.get('/health', handler)",
+      "source": "project_brief",
+      "confidence": "high",
+      "owner": "scout",
+      "status": "reviewed",
+      "quality_score": 100,
+      "quality_issues": []
+    }
+  ]
+}
+```
+
+## global/context_manifest.json
+Global progressive disclosure index:
+```json
+{
+  "version": 1,
+  "generatedAt": "2026-02-23T12:34:56.789Z",
+  "totalEntries": 4,
+  "specialists": [
+    {
+      "topic": "coding",
+      "count": 2,
+      "cache_path": "/home/user/.engineering-ai/global/specialists/coding.json",
+      "doc_path": "/home/user/.engineering-ai/global/specialists/coding.md"
+    }
+  ]
+}
+```
+
+## global/specialists/<topic>.json
+Canonical global context specialist file:
+```json
+{
+  "topic": "security",
+  "entries": [
+    {
+      "id": "append-173...",
+      "text": "Always validate input",
+      "summary": "Always validate input",
+      "rationale": "Prevent injection and malformed requests",
+      "priority": "must",
+      "topic": "security",
+      "confidence": "high",
+      "owner": "security",
+      "status": "approved",
+      "createdAt": "2026-02-23T12:34:56.789Z",
+      "updatedAt": "2026-02-23T12:34:56.789Z",
+      "source": "update_global_context",
+      "evidence": "docs/security.md:12-14: Validate and sanitize every external input",
+      "quality_score": 100,
+      "quality_issues": []
+    }
+  ]
+}
+```
+
 ## project_intelligence_files.json
 Incremental file-level intelligence cache used to avoid full rescans:
 ```json

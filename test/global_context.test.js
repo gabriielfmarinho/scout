@@ -7,16 +7,27 @@ const os = require("os");
 const path = require("path");
 const { toolUpdateGlobalContext } = require("../src/tools/tool_update_global_context");
 
-test("update_global_context appends entries", async () => {
+test("update_global_context persists global specialist context", async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "scout-global-ctx-"));
+  const prevCwd = process.cwd();
+  const prevEnv = process.env.SCOUT_PROJECT_ROOT;
+  process.env.SCOUT_PROJECT_ROOT = tmp;
+  process.chdir(tmp);
+  fs.writeFileSync(path.join(tmp, "package.json"), JSON.stringify({ name: "demo" }), "utf8");
+
   const globalDir = path.join(os.homedir(), ".engineering-ai", "global");
   const filePath = path.join(globalDir, "active-context.md");
   fs.mkdirSync(globalDir, { recursive: true });
-  fs.writeFileSync(filePath, "- [prefer] Existing\n");
+  fs.writeFileSync(filePath, "", "utf8");
 
-  await toolUpdateGlobalContext({ mode: "append", entries: ["[must] Name: Test User"] });
+  const out = await toolUpdateGlobalContext({ mode: "replace", entries: ["[prefer] Existing", "[must] Name: Test User"] });
 
-  const content = fs.readFileSync(filePath, "utf8");
-  assert.match(content, /Existing/);
-  assert.match(content, /Name: Test User/);
-  assert.match(content, /\[must\]/);
+  const manifestPath = path.join(globalDir, "context_manifest.json");
+  assert.ok(fs.existsSync(manifestPath));
+  assert.match(out, /ok/);
+  assert.match(out, /count/);
+
+  process.chdir(prevCwd);
+  if (prevEnv === undefined) delete process.env.SCOUT_PROJECT_ROOT;
+  else process.env.SCOUT_PROJECT_ROOT = prevEnv;
 });

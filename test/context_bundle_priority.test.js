@@ -6,6 +6,8 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { toolGetContextBundle } = require("../src/tools/tool_get_context_bundle");
+const { toolGenerateProjectBrief } = require("../src/tools/tool_generate_project_brief");
+const { toolUpdateGlobalContext } = require("../src/tools/tool_update_global_context");
 const { invalidateGlobalContextCache } = require("../src/utils/global_context_cache");
 const { ensureProjectDirs } = require("../src/utils/paths");
 
@@ -19,12 +21,19 @@ test("get_context_bundle supports preferential exclusion mode", async () => {
   const prevEnv = process.env.SCOUT_PROJECT_ROOT;
   process.env.SCOUT_PROJECT_ROOT = tmp;
   process.chdir(tmp);
-  const projectPaths = ensureProjectDirs(tmp);
-  fs.writeFileSync(path.join(projectPaths.docs, "active-context.md"), "- project rule\n", "utf8");
+  ensureProjectDirs(tmp);
+  fs.writeFileSync(path.join(tmp, "package.json"), JSON.stringify({ name: "demo", dependencies: { express: "4.0.0" } }), "utf8");
+  fs.mkdirSync(path.join(tmp, "src"), { recursive: true });
+  fs.writeFileSync(path.join(tmp, "src", "api.js"), "app.get('/health', handler)\n", "utf8");
+  await toolGenerateProjectBrief({ context_pack: "default" });
 
-  const globalDir = path.join(os.homedir(), ".engineering-ai", "global");
-  fs.mkdirSync(globalDir, { recursive: true });
-  fs.writeFileSync(path.join(globalDir, "active-context.md"), "- [must] Always validate input\n- [prefer] Prefer shorter names\n", "utf8");
+  await toolUpdateGlobalContext({
+    mode: "replace",
+    entries: [
+      "[must] Always validate input",
+      "[prefer] Prefer shorter names",
+    ],
+  });
   invalidateGlobalContextCache();
 
   const out = await toolGetContextBundle({ include_preferential: false, max_items: 20 });

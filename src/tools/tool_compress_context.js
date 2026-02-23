@@ -4,19 +4,7 @@ const path = require("path");
 const { ensureProjectDirs } = require("../utils/paths");
 const { readFileSafe, writeFileEnsureDir, fileExists } = require("../utils/fs_utils");
 const { buildActiveContextFromBrief, deriveFingerprint } = require("../utils/project_intelligence");
-
-function parseJsonl(content) {
-  const lines = content.split(/\r?\n/).filter(Boolean);
-  const items = [];
-  for (const line of lines) {
-    try {
-      items.push(JSON.parse(line));
-    } catch {
-      continue;
-    }
-  }
-  return items;
-}
+const { parseJsonl, writeSpecialistContext } = require("../utils/specialized_context");
 
 function extractTerms(text) {
   return text
@@ -52,7 +40,7 @@ async function toolCompressContext(args) {
   const devlogItems = parseJsonl(devlogContent);
 
   const activeContext = brief
-    ? buildActiveContextFromBrief(brief, devlogItems, maxBullets)
+    ? buildActiveContextFromBrief(brief, devlogItems, Number.MAX_SAFE_INTEGER)
     : (() => {
       const lines = [];
       if (fingerprint) {
@@ -61,13 +49,17 @@ async function toolCompressContext(args) {
         lines.push(`- Frameworks: ${fingerprint.frameworks?.join(", ") || "unknown"}`);
         lines.push(`- Infra: ${fingerprint.infra?.join(", ") || "none detected"}`);
       }
-      for (const item of devlogItems.slice(-10)) {
+      for (const item of devlogItems) {
         if (item && item.summary) lines.push(`- Recent: ${item.summary}`);
       }
-      return lines.slice(0, maxBullets).join("\n") + "\n";
+      return lines.join("\n") + "\n";
     })();
   const activePath = path.join(projectPaths.docs, "active-context.md");
   writeFileEnsureDir(activePath, activeContext);
+  let specialist = null;
+  if (brief) {
+    specialist = writeSpecialistContext(cwd, brief, devlogItems);
+  }
 
   const decisions = devlogItems.filter((i) => i.type === "decision");
   const decisionsLines = ["# Decisions", ""];
@@ -102,6 +94,9 @@ async function toolCompressContext(args) {
   output.push("");
   output.push(`Updated: ${activePath}`);
   output.push(`Updated: ${decisionsPath}`);
+  if (specialist) {
+    output.push(`Updated: ${specialist.manifestPath}`);
+  }
   if (glossaryTerms.length) {
     output.push(`Updated: ${path.join(projectPaths.docs, "glossary.md")}`);
   }

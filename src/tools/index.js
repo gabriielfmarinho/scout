@@ -10,12 +10,14 @@ const { toolCompressContext } = require("./tool_compress_context");
 const { toolPreparePr } = require("./tool_prepare_pr");
 const { toolDevlogAppend } = require("./tool_devlog_append");
 const { toolUpdateGlobalContext } = require("./tool_update_global_context");
+const { toolUpdateProjectContext } = require("./tool_update_project_context");
 const { toolSetActiveProject } = require("./tool_set_active_project");
 const { toolGetProjectRoot } = require("./tool_get_project_root");
 const { toolQueryStructure } = require("./tool_query_structure");
 const { toolGenerateProjectBrief } = require("./tool_generate_project_brief");
 const { toolListPromptTemplates } = require("./tool_list_prompt_templates");
 const { toolGetPromptTemplate } = require("./tool_get_prompt_template");
+const { toolAuditContextQuality } = require("./tool_audit_context_quality");
 const { validateSchema } = require("../utils/validate");
 const { getToolDefaults } = require("../utils/config");
 
@@ -27,8 +29,20 @@ const TOOLS = [
       type: "object",
       properties: {
         max_items: { type: "integer", minimum: 1, maximum: 200, default: 50 },
+        page_size: { type: "integer", minimum: 1, maximum: 500, default: 50 },
+        cursor: { type: "string", default: "" },
+        topics: {
+          type: "array",
+          items: { type: "string" },
+          default: ["overview"],
+        },
+        global_topics: {
+          type: "array",
+          items: { type: "string" },
+          default: ["all"],
+        },
         context_pack: { type: "string", enum: ["default", "debug", "refactor", "review"], default: "default" },
-        evidence_level: { type: "string", enum: ["minimal", "standard", "full"], default: "standard" },
+        evidence_level: { type: "string", enum: ["minimal", "standard", "full"], default: "full" },
         include_preferential: { type: "boolean", default: true },
         max_budget_items: { type: "integer", minimum: 1, maximum: 300, default: 30 },
         max_context_chars: { type: "integer", minimum: 1000, maximum: 100000, default: 10000 },
@@ -87,6 +101,8 @@ const TOOLS = [
         max_context_chars: { type: "integer", minimum: 1000, maximum: 100000, default: 10000 },
         max_per_file: { type: "integer", minimum: 1, maximum: 50, default: 5 },
         max_results: { type: "integer", minimum: 1, maximum: 200, default: 50 },
+        persist_to_context: { type: "boolean", default: false },
+        persist_topic: { type: "string", default: "flows" },
       },
       required: ["target"],
       additionalProperties: false,
@@ -159,6 +175,8 @@ const TOOLS = [
         max_results: { type: "integer", minimum: 1, maximum: 200, default: 50 },
         context_pack: { type: "string", enum: ["default", "debug", "refactor", "review"], default: "default" },
         evidence_level: { type: "string", enum: ["minimal", "standard", "full"], default: "standard" },
+        persist_to_context: { type: "boolean", default: false },
+        persist_topic: { type: "string", default: "flows" },
       },
       required: ["target"],
       additionalProperties: false,
@@ -192,6 +210,20 @@ const TOOLS = [
       additionalProperties: false,
     },
     handler: toolGetPromptTemplate,
+  },
+  {
+    name: "audit_context_quality",
+    description: "Audit documentation/context quality and list low-quality entries with actionable issues.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        scope: { type: "string", enum: ["project", "global", "all"], default: "all" },
+        min_quality: { type: "integer", minimum: 0, maximum: 100, default: 70 },
+        max_results: { type: "integer", minimum: 1, maximum: 1000, default: 200 },
+      },
+      additionalProperties: false,
+    },
+    handler: toolAuditContextQuality,
   },
   {
     name: "prepare_pr",
@@ -230,13 +262,41 @@ const TOOLS = [
       properties: {
         mode: { type: "string", enum: ["append", "replace"], default: "append" },
         priority: { type: "string", enum: ["must", "prefer"], default: "prefer" },
+        topic: { type: "string" },
         strict_priority: { type: "boolean", default: true },
         entries: { type: "array", items: { type: "string" }, default: [] },
+        entries_structured: {
+          type: "array",
+          items: { type: "object" },
+          default: [],
+        },
+        strict_quality: { type: "boolean", default: false },
       },
-      required: ["entries"],
       additionalProperties: false,
     },
     handler: toolUpdateGlobalContext,
+  },
+  {
+    name: "update_project_context",
+    description: "Update project-scoped preferences/rules in specialist context files.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mode: { type: "string", enum: ["append", "replace"], default: "append" },
+        priority: { type: "string", enum: ["must", "prefer"], default: "prefer" },
+        topic: { type: "string" },
+        strict_priority: { type: "boolean", default: true },
+        entries: { type: "array", items: { type: "string" }, default: [] },
+        entries_structured: {
+          type: "array",
+          items: { type: "object" },
+          default: [],
+        },
+        strict_quality: { type: "boolean", default: false },
+      },
+      additionalProperties: false,
+    },
+    handler: toolUpdateProjectContext,
   },
   {
     name: "set_active_project",

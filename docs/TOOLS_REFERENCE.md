@@ -3,16 +3,17 @@
 This reference documents each tool, its parameters, and output format.
 
 ## get_context_bundle
-- Purpose: Load relevant context (global + project) before coding or analysis.
+- Purpose: Progressive disclosure loader for relevant context (global + specialist project files) before coding or analysis.
 - Input:
   - `max_items` (int, default 50)
+  - `page_size` (int, default 50)
+  - `cursor` (string, default empty; opaque token returned by previous call)
+  - `topics` (string[], default `["overview"]`; accepts predefined and dynamic topic names)
+  - `global_topics` (string[], default `["all"]`; accepts predefined and dynamic topic names)
   - `context_pack` (default|debug|refactor|review, default `default`)
-  - `evidence_level` (minimal|standard|full, default `standard`)
+  - `evidence_level` (minimal|standard|full, default `full`)
   - `include_preferential` (bool, default `true`)
-  - `max_budget_items` (int, default 30)
-  - `max_context_chars` (int, default 10000)
-  - `max_per_file` (int, default 5)
-- Output: Markdown with evidence lines.
+- Output: Markdown with evidence lines and metadata (`returned_items`, `total_items`, `has_more`, `next_cursor`).
 
 ## analyze_project
 - Purpose: Detect languages, build tools, frameworks, infra, CI/CD, monorepo, data, tests.
@@ -49,6 +50,8 @@ This reference documents each tool, its parameters, and output format.
   - `max_context_chars` (int, default 10000)
   - `max_per_file` (int, default 5)
   - `max_results` (int, default 50)
+  - `persist_to_context` (bool, default `false`) append analysis results into project specialist context
+  - `persist_topic` (string, default `flows`) specialist topic used when persisting
 - Output: TOON table: `component | impact | risk | evidence`
 
 ## generate_project_brief
@@ -67,6 +70,8 @@ This reference documents each tool, its parameters, and output format.
   - `max_results` (int, default 50)
   - `context_pack` (default|debug|refactor|review, default `default`)
   - `evidence_level` (minimal|standard|full, default `standard`)
+  - `persist_to_context` (bool, default `false`) append query findings into project specialist context
+  - `persist_topic` (string, default `flows`) specialist topic used when persisting
 - Output: TOON table with evidence.
 
 ## list_prompt_templates
@@ -133,9 +138,34 @@ This reference documents each tool, its parameters, and output format.
 - Input:
   - `mode` (append|replace, default append)
   - `priority` (must|prefer, default `prefer`) used as fallback for unprefixed entries
+  - `topic` (string, optional) explicit global topic (supports dynamic topics)
   - `strict_priority` (bool, default `true`) when true, entries must be prefixed `[must]`/`[prefer]` or use `priority`
-  - `entries` (string[], required)
-- Output: TOON confirmation row + updated file path.
+  - `entries` (string[], optional)
+  - `entries_structured` (object[], optional) structured documentation entries
+  - `strict_quality` (bool, default `false`) validates structured entries and rejects placeholders/invalid evidence/snippet mismatch
+  - Requirement: at least one of `entries` or `entries_structured`
+- Output: TOON confirmation row + `active-context.md` path + global `context_manifest.json`.
+
+## update_project_context
+- Purpose: Update project-scoped preferences/rules in specialist context files.
+- Input:
+  - `mode` (append|replace, default append)
+  - `priority` (must|prefer, default `prefer`) used as fallback for unprefixed entries
+  - `topic` (string, optional) explicit project topic (supports dynamic topics)
+  - `strict_priority` (bool, default `true`) when true, entries must be prefixed `[must]`/`[prefer]` or use `priority`
+  - `entries` (string[], optional)
+  - `entries_structured` (object[], optional) structured documentation entries
+  - `strict_quality` (bool, default `false`) validates structured entries and rejects placeholders/invalid evidence/snippet mismatch
+  - Requirement: at least one of `entries` or `entries_structured`
+- Output: TOON confirmation row + project manifest path.
+
+## audit_context_quality
+- Purpose: Audit quality of project/global documentation entries and flag low-quality items.
+- Input:
+  - `scope` (project|global|all, default `all`)
+  - `min_quality` (int 0-100, default 70)
+  - `max_results` (int, default 200)
+- Output: TOON table: `scope | topic | quality | status | issues | evidence`
 
 ## set_active_project
 - Purpose: Set the active project root without IDE configuration.

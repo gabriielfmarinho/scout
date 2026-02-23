@@ -6,7 +6,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { resolveProjectRoot } = require("../src/utils/project_root");
-const { getActiveProjectPath } = require("../src/utils/active_project");
+const { getActiveProjectPath, writeActiveProject } = require("../src/utils/active_project");
 
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "scout-root-"));
@@ -40,4 +40,27 @@ test("resolveProjectRoot finds single project under cwd", () => {
   process.chdir(prevCwd);
 
   assert.equal(root, path.resolve(project));
+});
+
+test("resolveProjectRoot prioritizes cwd markers over stale active project", () => {
+  const tmp = makeTempDir();
+  const stale = path.join(tmp, "stale-project");
+  const current = path.join(tmp, "current-project");
+  fs.mkdirSync(stale, { recursive: true });
+  fs.mkdirSync(current, { recursive: true });
+  fs.writeFileSync(path.join(current, "package.json"), "{}\n");
+
+  const prevEnv = process.env.SCOUT_PROJECT_ROOT;
+  delete process.env.SCOUT_PROJECT_ROOT;
+  writeActiveProject(stale);
+
+  const prevCwd = process.cwd();
+  process.chdir(current);
+  const root = resolveProjectRoot();
+  process.chdir(prevCwd);
+
+  if (prevEnv === undefined) delete process.env.SCOUT_PROJECT_ROOT;
+  else process.env.SCOUT_PROJECT_ROOT = prevEnv;
+
+  assert.equal(root, path.resolve(current));
 });

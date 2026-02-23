@@ -27,6 +27,12 @@ Formato de saída:
 3) Síntese final com recomendação objetiva
 4) Condições que mudariam a decisão
 5) Próximos passos práticos (curto prazo)
+6) Bloco de persistência estruturada para contexto (obrigatório):
+   - `summary` claro e específico (sem termos vagos como TODO/TBD)
+   - `rationale` explicando por que a decisão foi tomada
+   - `evidence` no formato `<arquivo>:<linha-inicio>-<linha-fim>: <trecho>`
+   - `owner` responsável pela decisão
+   - `confidence` (`high|medium|low`) e `status` (`draft|reviewed|approved|deprecated`)
 ```
 
 ## Variant B - Debate Without Project Context
@@ -53,4 +59,10 @@ Formato de saída:
 3) Matriz de trade-offs
 4) Recomendação por cenário
 5) Checklist para decisão final
+6) Bloco de persistência estruturada para contexto (obrigatório):
+   - `summary` claro e específico (sem termos vagos como TODO/TBD)
+   - `rationale` explicando por que a decisão foi tomada
+   - `evidence` no formato `<arquivo>:<linha-inicio>-<linha-fim>: <trecho>`
+   - `owner` responsável pela decisão
+   - `confidence` (`high|medium|low`) e `status` (`draft|reviewed|approved|deprecated`)
 ```

@@ -17,6 +17,12 @@ Scout runs as a local process (stdio MCP server). All analysis is done on the lo
 ~/.engineering-ai/
   global/
     active-context.md
+    context_manifest.json
+    specialists/
+      coding.json
+      coding.md
+      security.json
+      security.md
   projects/
     <project-name>/
       cache/
@@ -32,7 +38,7 @@ Scout runs as a local process (stdio MCP server). All analysis is done on the lo
 ```
 
 ### Global context
-`~/.engineering-ai/global/active-context.md` stores preferences that apply to **all** projects (name, coding style, standards). `get_context_bundle` loads this before the project context.
+Global context is persisted canonically in `~/.engineering-ai/global/context_manifest.json` and `~/.engineering-ai/global/specialists/*.json`. `active-context.md` is an index/derived view. `get_context_bundle` supports on-demand global loading via `global_topics`.
 
 ### Project context
 `~/.engineering-ai/projects/<project-name>/docs/active-context.md` stores preferences and rules specific to the current repo.
@@ -136,6 +142,11 @@ Example call:
 { "name": "analyze_impact", "arguments": { "target": "billing status", "context_pack": "refactor", "evidence_level": "standard" } }
 ```
 
+Persist point-analysis into project context (merge, no full rewrite):
+```json
+{ "name": "analyze_impact", "arguments": { "target": "processPayment", "persist_to_context": true, "persist_topic": "flow-investigation" } }
+```
+
 ### 5) `generate_project_brief`
 When to use: produce a structured Project Brief (summary, flows, integrations, runtime configs, conventions, hotspots).
 
@@ -150,6 +161,11 @@ When to use: run structured queries like who-calls, what-calls, and find-symbol.
 Example call:
 ```json
 { "name": "query_structure", "arguments": { "mode": "who_calls", "target": "processPayment", "evidence_level": "minimal" } }
+```
+
+Persist point-query into project context (merge, no full rewrite):
+```json
+{ "name": "query_structure", "arguments": { "mode": "who_calls", "target": "processPayment", "persist_to_context": true, "persist_topic": "flow-investigation" } }
 ```
 
 ### 7) `review_diff`
@@ -200,6 +216,38 @@ Example call:
 { "name": "update_global_context", "arguments": { "mode": "append", "entries": ["[must] Use explicit error handling", "[prefer] Prefer short functions", "[prefer] Name: Gabriel"] } }
 ```
 
+Optional dynamic topic:
+```json
+{ "name": "update_global_context", "arguments": { "mode": "append", "topic": "team-playbook", "entries": ["[must] ADR required for breaking API changes"] } }
+```
+
+Structured quality-controlled entry:
+```json
+{ "name": "update_global_context", "arguments": { "entries_structured": [{ "topic": "team-playbook", "summary": "ADR required for breaking API changes", "rationale": "Preserve architecture decisions", "evidence": "docs/adr.md:1-1: ADR process", "confidence": "high", "owner": "architecture", "status": "approved", "priority": "must" }], "strict_quality": true } }
+```
+
+### 13) `update_project_context`
+When to use: add project-scoped context rules/preferences to predefined or dynamic specialist topics.
+
+Example call:
+```json
+{ "name": "update_project_context", "arguments": { "mode": "append", "topic": "domain-rules", "entries": ["[must] Maintain backward compatibility for billing payload"] } }
+```
+
+### 14) `audit_context_quality`
+When to use: detect low-quality documentation/context entries (missing evidence, weak rationale, stale items).
+
+Example call:
+```json
+{ "name": "audit_context_quality", "arguments": { "scope": "all", "min_quality": 75, "max_results": 200 } }
+```
+
+Quality essentials now enforced when `strict_quality=true`:
+- rejects placeholder summaries (ex: `TODO`, `TBD`, `unknown`, `n/a`)
+- validates evidence format and file/line range
+- validates that evidence snippet matches the referenced lines
+- enforces status workflow transitions (`draft -> reviewed -> approved -> deprecated`)
+
 ## Evidence-first behavior
 All analysis and search outputs include evidence in the form:
 ```
@@ -215,6 +263,11 @@ This allows the LLM to verify claims and reduces hallucination.
 - Tool-level telemetry is persisted to `cache/telemetry.jsonl` for context and truncation monitoring.
 - Global rules support priorities: `[must]` and `[prefer]`.
 - `[must]` rules are always included in `get_context_bundle`; `[prefer]` rules are budgeted/on-demand.
+- Progressive disclosure: specialist context files are indexed in `cache/context_manifest.json` and loaded by topic/cursor on demand.
+- Dynamic topics: both project and global contexts accept dynamic specialist topics in addition to predefined ones.
+- Lossless persistence: canonical context is stored in full specialist files under `cache/specialists/*.json`; pagination limits response size, not stored data.
+- Automatic quality metadata: persisted entries keep `summary`, `rationale`, `owner`, `confidence`, `status`, `quality_score`, and `quality_issues`.
+- Analysis merges with quality fields: `analyze_impact` and `query_structure` persist structured entries (not only raw text) when `persist_to_context=true`.
 
 ## Canonical persistence
 - `cache/project_brief.json` is the canonical project intelligence snapshot.
